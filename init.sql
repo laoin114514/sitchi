@@ -35,6 +35,7 @@ CREATE TABLE roles (
     role_code VARCHAR(50) NOT NULL,
     description VARCHAR(200),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_delete BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(module_id, role_code),
@@ -49,6 +50,7 @@ CREATE TABLE permissions (
     perm_name VARCHAR(50) NOT NULL,
     description VARCHAR(200),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_delete BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(module_id, perm_code),
@@ -70,7 +72,7 @@ CREATE TABLE resources (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(module_id, res_code),
     UNIQUE(id, module_id),
-    FOREIGN KEY (parent_id, module_id) REFERENCES resources(id, module_id) ON DELETE SET NULL,
+    FOREIGN KEY (parent_id, module_id) REFERENCES resources(id, module_id) ON DELETE SET NULL
     
 );
 
