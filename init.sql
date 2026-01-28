@@ -5,7 +5,8 @@ CREATE TABLE modules (
     module_code VARCHAR(100) UNIQUE NOT NULL,
     module_name VARCHAR(100) NOT NULL,
     description VARCHAR(200),
-    status SMALLINT DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_delete BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -19,7 +20,8 @@ CREATE TABLE users (
     module_id INTEGER NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
     password VARCHAR(100) NOT NULL,
     email VARCHAR(100),
-    status SMALLINT DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_delete BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(module_id, user_code),
@@ -32,6 +34,7 @@ CREATE TABLE roles (
     module_id INTEGER NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
     role_code VARCHAR(50) NOT NULL,
     description VARCHAR(200),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(module_id, role_code),
@@ -45,6 +48,7 @@ CREATE TABLE permissions (
     perm_code VARCHAR(50) NOT NULL,
     perm_name VARCHAR(50) NOT NULL,
     description VARCHAR(200),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(module_id, perm_code),
@@ -61,12 +65,13 @@ CREATE TABLE resources (
     parent_id INTEGER DEFAULT NULL, 
     path VARCHAR(200),
     description VARCHAR(200),
-    status SMALLINT DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(module_id, res_code),
     UNIQUE(id, module_id),
-    FOREIGN KEY (parent_id, module_id) REFERENCES resources(id, module_id) ON DELETE SET NULL
+    FOREIGN KEY (parent_id, module_id) REFERENCES resources(id, module_id) ON DELETE SET NULL,
+    
 );
 
 
@@ -111,3 +116,17 @@ CREATE TABLE user_perm_res (
     FOREIGN KEY (perm_id, module_id) REFERENCES permissions(id, module_id) ON DELETE CASCADE,
     FOREIGN KEY (res_id,  module_id) REFERENCES resources(id, module_id) ON DELETE CASCADE
 );
+
+
+-- resources 树查询：按父节点找子节点
+CREATE INDEX IF NOT EXISTS idx_resources_module_parent ON resources(module_id, parent_id);
+
+-- user_roles：既要按 user 找角色，也要在 role 变更时按 role 找用户
+CREATE INDEX IF NOT EXISTS idx_user_roles_module_user ON user_roles(module_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_module_role ON user_roles(module_id, role_id);
+
+-- role_permission_resources：按 role 找权限资源
+CREATE INDEX IF NOT EXISTS idx_rpr_module_role ON role_permission_resources(module_id, role_id);
+
+-- user_perm_res：常见按 user 拉取所有权限（PK 可用于 exists 校验；该索引利于按 user 扫描）
+CREATE INDEX IF NOT EXISTS idx_upr_module_user ON user_perm_res(module_id, user_id);
