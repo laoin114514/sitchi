@@ -5,6 +5,7 @@ import (
 	"os"
 	"sitchi/configs"
 	"sitchi/configs/db"
+	"strconv"
 )
 
 func init() {
@@ -26,6 +27,12 @@ func main() {
 		downMigrate()
 	case "runServer":
 		runServer()
+	case "migrateStep":
+		stepCount, err := strconv.Atoi(os.Args[2])
+		if err != nil {
+			log.Fatalf("参数错误: %v", err)
+		}
+		migrateStep(stepCount)
 	}
 }
 func migrate() {
@@ -40,7 +47,12 @@ func downMigrate() {
 		log.Fatalf("数据库回滚失败: %v", err)
 	}
 }
-
+func migrateStep(step int) {
+	err := db.MigrateStep(&configs.AppConfig.Db, step)
+	if err != nil {
+		log.Fatalf("数据库迁移失败: %v", err)
+	}
+}
 func runServer() {
 	err := db.InitDb(&configs.AppConfig.Db)
 	if err != nil {

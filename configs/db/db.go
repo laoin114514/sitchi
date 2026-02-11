@@ -58,3 +58,17 @@ func DownMigrate(dbConfig *configs.DbConfig) error {
 	log.Println("数据库回滚成功")
 	return nil
 }
+func MigrateStep(dbConfig *configs.DbConfig, step int) error {
+	m, err := migrate.New(
+		"file://configs/db/migrations",
+		fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s", dbConfig.User, dbConfig.Password, dbConfig.Host, dbConfig.Port, dbConfig.Dbname, dbConfig.SSLMode),
+	)
+	if err != nil {
+		return err
+	}
+	if err := m.Steps(step); err != nil {
+		return err
+	}
+	log.Println("数据库迁移成功")
+	return nil
+}
