@@ -1,3 +1,4 @@
 logs
 .env
 configs.dev.yml
+*.exe
