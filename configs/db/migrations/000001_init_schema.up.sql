@@ -1,11 +1,11 @@
-
 -- 模块表
 CREATE TABLE modules (
     id SERIAL PRIMARY KEY,
-    module_code VARCHAR(100) UNIQUE NOT NULL,
+    module_code VARCHAR(100) NOT NULL,
     module_name VARCHAR(100) NOT NULL,
     description VARCHAR(200),
-    status SMALLINT DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -19,10 +19,10 @@ CREATE TABLE users (
     module_id INTEGER NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
     password VARCHAR(100) NOT NULL,
     email VARCHAR(100),
-    status SMALLINT DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(module_id, user_code),
     UNIQUE(id, module_id)
 );
 
@@ -32,9 +32,10 @@ CREATE TABLE roles (
     module_id INTEGER NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
     role_code VARCHAR(50) NOT NULL,
     description VARCHAR(200),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(module_id, role_code),
     UNIQUE(id, module_id)
 );
 
@@ -45,9 +46,10 @@ CREATE TABLE permissions (
     perm_code VARCHAR(50) NOT NULL,
     perm_name VARCHAR(50) NOT NULL,
     description VARCHAR(200),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(module_id, perm_code),
     UNIQUE(id, module_id)
 );
 
@@ -58,17 +60,16 @@ CREATE TABLE resources (
     res_code VARCHAR(100) NOT NULL,
     res_name VARCHAR(100) NOT NULL,
     res_type VARCHAR(20) NOT NULL,
-    parent_id INTEGER DEFAULT NULL, 
+    parent_id INTEGER DEFAULT NULL,
     path VARCHAR(200),
     description VARCHAR(200),
-    status SMALLINT DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(module_id, res_code),
     UNIQUE(id, module_id),
     FOREIGN KEY (parent_id, module_id) REFERENCES resources(id, module_id) ON DELETE SET NULL
 );
-
 
 -- 用户-角色关联表
 CREATE TABLE user_roles (
@@ -78,7 +79,7 @@ CREATE TABLE user_roles (
     role_id INTEGER NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(module_id,user_id, role_id),
+    UNIQUE(module_id, user_id, role_id),
     FOREIGN KEY (user_id, module_id) REFERENCES users(id, module_id) ON DELETE CASCADE,
     FOREIGN KEY (role_id, module_id) REFERENCES roles(id, module_id) ON DELETE CASCADE
 );
@@ -89,25 +90,64 @@ CREATE TABLE role_permission_resources (
     role_id INTEGER NOT NULL,
     perm_id INTEGER NOT NULL,
     res_id INTEGER NOT NULL,
-    module_id INTEGER NOT NULL REFERENCES modules(id) ON DELETE CASCADE,    
+    module_id INTEGER NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(module_id,role_id, perm_id, res_id),
+    UNIQUE(module_id, role_id, perm_id, res_id),
     FOREIGN KEY (role_id, module_id) REFERENCES roles(id, module_id) ON DELETE CASCADE,
     FOREIGN KEY (perm_id, module_id) REFERENCES permissions(id, module_id) ON DELETE CASCADE,
-    FOREIGN KEY (res_id, module_id) REFERENCES resources(id, module_id) ON DELETE CASCADE
+    FOREIGN KEY (res_id,  module_id) REFERENCES resources(id, module_id) ON DELETE CASCADE
 );
 
--- 用户最终权限表
+-- 用户最终权限表（缓存表）
 CREATE TABLE user_perm_res (
     module_id INT NOT NULL,
     user_id   INT NOT NULL,
     perm_id   INT NOT NULL,
     res_id    INT NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (module_id, user_id, perm_id, res_id),
     FOREIGN KEY (user_id, module_id) REFERENCES users(id, module_id) ON DELETE CASCADE,
     FOREIGN KEY (perm_id, module_id) REFERENCES permissions(id, module_id) ON DELETE CASCADE,
     FOREIGN KEY (res_id,  module_id) REFERENCES resources(id, module_id) ON DELETE CASCADE
 );
+
+-- ========== 部分唯一索引（允许软删后复用 code） ==========
+
+-- modules: module_code 全局唯一（仅未删除）
+CREATE UNIQUE INDEX IF NOT EXISTS uq_modules_module_code_active
+ON modules(module_code)
+WHERE is_deleted = FALSE;
+
+-- users: (module_id, user_code) 仅未删除唯一
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_module_user_code_active
+ON users(module_id, user_code)
+WHERE is_deleted = FALSE;
+
+-- roles: (module_id, role_code) 仅未删除唯一
+CREATE UNIQUE INDEX IF NOT EXISTS uq_roles_module_role_code_active
+ON roles(module_id, role_code)
+WHERE is_deleted = FALSE;
+
+-- permissions: (module_id, perm_code) 仅未删除唯一
+CREATE UNIQUE INDEX IF NOT EXISTS uq_permissions_module_perm_code_active
+ON permissions(module_id, perm_code)
+WHERE is_deleted = FALSE;
+
+-- resources: (module_id, res_code) 仅未删除唯一
+CREATE UNIQUE INDEX IF NOT EXISTS uq_resources_module_res_code_active
+ON resources(module_id, res_code)
+WHERE is_deleted = FALSE;
+
+-- resources 树查询：按父节点找子节点
+CREATE INDEX IF NOT EXISTS idx_resources_module_parent ON resources(module_id, parent_id);
+
+-- user_roles：既要按 user 找角色，也要在 role 变更时按 role 找用户
+CREATE INDEX IF NOT EXISTS idx_user_roles_module_user ON user_roles(module_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_module_role ON user_roles(module_id, role_id);
+
+-- role_permission_resources：按 role 找权限资源
+CREATE INDEX IF NOT EXISTS idx_rpr_module_role ON role_permission_resources(module_id, role_id);
+
+-- user_perm_res：按用户拉取所有权限
+CREATE INDEX IF NOT EXISTS idx_upr_module_user ON user_perm_res(module_id, user_id);

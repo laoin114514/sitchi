@@ -1,0 +1,17 @@
+server:
+  port: 5090
+  host: 0.0.0.0
+
+db:
+  host: host.docker.internal
+  port: 5432
+  user: sitchi
+  password: change_me_prod_password
+  dbname: sitchi
+  sslmode: disable
+
+auth:
+  jwt_secret: "change_me_prod_secret"
+  token_ttl_minutes: 1440
+
+dev: false
