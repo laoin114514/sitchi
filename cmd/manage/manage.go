@@ -18,6 +18,10 @@ func init() {
 		log.Fatalf("加载配置文件失败: %v", err)
 	}
 
+	err = db.InitDb(&configs.AppConfig.Db)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 }
 func main() {
 	switch os.Args[1] {
@@ -54,10 +58,7 @@ func migrateStep(step int) {
 	}
 }
 func runServer() {
-	err := db.InitDb(&configs.AppConfig.Db)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
+
 	//启动服务写在这
 
 }
