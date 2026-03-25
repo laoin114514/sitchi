@@ -279,3 +279,33 @@ func getRoleIDByCode(tx *sql.Tx, moduleID int64, roleCode string) (int64, error)
 func moduleRoleCode(moduleCode, roleCode string) string {
 	return fmt.Sprintf("%s:%s", moduleCode, roleCode)
 }
+
+func ensureSuperRole(tx *sql.Tx, moduleID int64, moduleCode string) (int64, error) {
+	superRoleCode := moduleRoleCode(moduleCode, "super")
+
+	var roleID int64
+	err := tx.QueryRow(`
+		SELECT id
+		FROM roles
+		WHERE module_id = $1
+		  AND role_code = $2
+		  AND is_deleted = FALSE
+	`, moduleID, superRoleCode).Scan(&roleID)
+	if err == nil {
+		return roleID, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, err
+	}
+
+	err = tx.QueryRow(`
+		INSERT INTO roles (module_id, role_code, description)
+		VALUES ($1, $2, $3)
+		RETURNING id
+	`, moduleID, superRoleCode, "超级管理员角色").Scan(&roleID)
+	if err != nil {
+		return 0, err
+	}
+
+	return roleID, nil
+}

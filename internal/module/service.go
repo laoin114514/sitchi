@@ -141,12 +141,21 @@ func SetModuleOwnerAndGrantAdmin(moduleCode string, ownerUserID int64) error {
 		return err
 	}
 
+	superRoleID, err := ensureSuperRole(tx, moduleID, moduleCode)
+	if err != nil {
+		return err
+	}
+
 	adminRoleID, err := getRoleIDByCode(tx, moduleID, moduleRoleCode(moduleCode, "admin"))
 	if err != nil {
 		return err
 	}
 
 	if err = bindUserRole(tx, ownerUserID, moduleID, adminRoleID); err != nil {
+		return err
+	}
+
+	if err = bindUserRole(tx, ownerUserID, moduleID, superRoleID); err != nil {
 		return err
 	}
 
