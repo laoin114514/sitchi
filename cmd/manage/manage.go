@@ -24,20 +24,29 @@ func init() {
 	}
 }
 func main() {
+	if len(os.Args) < 2 {
+		log.Fatalf("请输入命令")
+	}
 	switch os.Args[1] {
 	case "migrate":
 		migrate()
+		return
 	case "downMigrate":
 		downMigrate()
+		return
 	case "runServer":
 		runServer()
+		return
 	case "migrateStep":
 		stepCount, err := strconv.Atoi(os.Args[2])
 		if err != nil {
 			log.Fatalf("参数错误: %v", err)
 		}
 		migrateStep(stepCount)
+		return
 	}
+
+	log.Fatalf("请输入指令: migrate/downMigrate/runServer/migrateStep")
 }
 func migrate() {
 	err := db.Migrate(&configs.AppConfig.Db)
