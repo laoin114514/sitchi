@@ -18,46 +18,37 @@ func init() {
 		log.Fatalf("加载配置文件失败: %v", err)
 	}
 
+	err = db.InitDb(&configs.AppConfig.Db)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 }
 func main() {
+	if len(os.Args) < 2 {
+		log.Fatalf("请输入命令")
+	}
 	switch os.Args[1] {
 	case "migrate":
 		migrate()
+		return
 	case "downMigrate":
 		downMigrate()
+		return
 	case "runServer":
 		runServer()
+		return
+	case "initSystem":
+		migrate()
+		initSystem()
+		return
 	case "migrateStep":
 		stepCount, err := strconv.Atoi(os.Args[2])
 		if err != nil {
 			log.Fatalf("参数错误: %v", err)
 		}
 		migrateStep(stepCount)
+		return
 	}
-}
-func migrate() {
-	err := db.Migrate(&configs.AppConfig.Db)
-	if err != nil {
-		log.Fatalf("数据库迁移失败: %v", err)
-	}
-}
-func downMigrate() {
-	err := db.DownMigrate(&configs.AppConfig.Db)
-	if err != nil {
-		log.Fatalf("数据库回滚失败: %v", err)
-	}
-}
-func migrateStep(step int) {
-	err := db.MigrateStep(&configs.AppConfig.Db, step)
-	if err != nil {
-		log.Fatalf("数据库迁移失败: %v", err)
-	}
-}
-func runServer() {
-	err := db.InitDb(&configs.AppConfig.Db)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-	//启动服务写在这
 
+	log.Fatalf("请输入指令: migrate/downMigrate/runServer/initSystem/initModule/migrateStep")
 }
