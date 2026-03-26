@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"sitchi/configs"
 	"sitchi/configs/db"
+	"sitchi/internal"
 	"sitchi/internal/module"
 	"sitchi/internal/user"
 	"time"
@@ -85,15 +85,9 @@ func runServer() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "ok",
-			"service": "sitchi",
-		})
-	})
+	internal.InitRouter(r)
 
 	addr := fmt.Sprintf("%s:%d", configs.AppConfig.Server.Host, configs.AppConfig.Server.Port)
-	log.Printf("server starting at %s", addr)
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("服务启动失败: %v", err)
 	}
