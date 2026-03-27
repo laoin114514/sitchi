@@ -2,6 +2,7 @@ package internal
 
 import (
 	"net/http"
+	"sitchi/internal/user"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,5 +17,8 @@ func InitRouter(r *gin.Engine) {
 			"time":    time.Now().Format("2006-01-02 15:04:05"),
 		})
 	})
-
+	webuiApiGroup := r.Group("/api/webui")
+	{
+		webuiApiGroup.POST("/login", user.LoginController)
+	}
 }

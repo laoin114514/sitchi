@@ -3,8 +3,13 @@ package user
 import (
 	"errors"
 	"strings"
+	"time"
 
+	"sitchi/configs"
 	"sitchi/configs/db"
+	"sitchi/internal/common"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type CreateUserParams struct {
@@ -16,11 +21,29 @@ type CreateUserParams struct {
 	Description string
 }
 
+type LoginParams struct {
+	ModuleCode string
+	UserCode   string
+	Password   string
+}
+
+type LoginResult struct {
+	UserID       int64
+	ModuleCode   string
+	AccessToken  string
+	RefreshToken string
+	Roles        []string
+}
+
 var (
 	ErrInvalidCreateUserParams = errors.New("invalid create user params")
+	ErrInvalidLoginParams      = errors.New("invalid login params")
 	ErrDBNotInitialized        = errors.New("db pool is not initialized")
 	ErrModuleNotFound          = errors.New("module not found")
 	ErrDefaultRoleNotFound     = errors.New("default role not found")
+	ErrUserNotFound            = errors.New("user not found")
+	ErrPasswordMismatch        = errors.New("password mismatch")
+	ErrJWTNotConfigured        = errors.New("jwt not configured")
 )
 
 // CreateUser 创建用户并绑定模块默认角色（module_code:normal），最后刷新用户权限缓存。
@@ -81,4 +104,76 @@ func CreateUser(params CreateUserParams) (int64, error) {
 	}
 
 	return userID, nil
+}
+
+// Login 校验账号密码并签发 access/refresh token。
+func Login(params LoginParams) (*LoginResult, error) {
+	if db.Pool == nil {
+		return nil, ErrDBNotInitialized
+	}
+
+	moduleCode := strings.TrimSpace(params.ModuleCode)
+	userCode := strings.TrimSpace(params.UserCode)
+	password := strings.TrimSpace(params.Password)
+	if moduleCode == "" || userCode == "" || password == "" {
+		return nil, ErrInvalidLoginParams
+	}
+
+	jwtSecret := strings.TrimSpace(configs.AppConfig.Auth.JwtSecret)
+	if jwtSecret == "" {
+		return nil, ErrJWTNotConfigured
+	}
+
+	tx, err := db.Pool.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	rec, err := getUserAuthRecordByCode(tx, moduleCode, userCode)
+	if err != nil {
+		return nil, err
+	}
+
+	if bcrypt.CompareHashAndPassword([]byte(rec.Password), []byte(password)) != nil {
+		return nil, ErrPasswordMismatch
+	}
+
+	ttlMinutes := configs.AppConfig.Auth.TokenTTLMinutes
+	if ttlMinutes <= 0 {
+		ttlMinutes = 60
+	}
+
+	jwtSvc := common.NewJwtAuthService(
+		jwtSecret,
+		"sitchi",
+		time.Duration(ttlMinutes)*time.Minute,
+		time.Duration(ttlMinutes*24*7)*time.Minute,
+	)
+
+	accessToken, err := jwtSvc.GenerateAccessToken(rec.UserID, rec.ModuleCode, rec.Roles)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := jwtSvc.GenerateRefreshToken(rec.UserID, rec.ModuleCode)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &LoginResult{
+		UserID:       rec.UserID,
+		ModuleCode:   rec.ModuleCode,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		Roles:        rec.Roles,
+	}, nil
 }
