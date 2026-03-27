@@ -76,7 +76,12 @@ func CreateUser(params CreateUserParams) (int64, error) {
 		return 0, err
 	}
 
-	userID, err := insertUser(tx, moduleID, userCode, userName, strings.TrimSpace(params.Description), password, strings.TrimSpace(params.Email))
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return 0, err
+	}
+
+	userID, err := insertUser(tx, moduleID, userCode, userName, strings.TrimSpace(params.Description), string(hashedPassword), strings.TrimSpace(params.Email))
 	if err != nil {
 		return 0, err
 	}
