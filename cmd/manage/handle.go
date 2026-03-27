@@ -76,8 +76,12 @@ func runServer() {
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
+	allowOrigins := []string{fmt.Sprintf("http://%s:%d", configs.AppConfig.Server.Host, configs.AppConfig.Server.Port)}
+	if configs.AppConfig != nil && configs.AppConfig.Dev {
+		allowOrigins = append(allowOrigins, "http://localhost:5173")
+	}
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{fmt.Sprintf("http://%s:%d", configs.AppConfig.Server.Host, configs.AppConfig.Server.Port)},
+		AllowOrigins:     allowOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
