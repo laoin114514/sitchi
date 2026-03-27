@@ -15,8 +15,9 @@ type Config struct {
 	Dev    bool         `yaml:"dev"`
 }
 type ServerConfig struct {
-	Port int    `yaml:"port"`
-	Host string `yaml:"host"`
+	Port         int      `yaml:"port"`
+	Host         string   `yaml:"host"`
+	AllowOrigins []string `yaml:"allow_origins"`
 }
 type DbConfig struct {
 	Host     string `yaml:"host"`

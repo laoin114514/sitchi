@@ -1,4 +1,5 @@
 logs
 .env
 configs.dev.yml
+configs.prod.yml
 *.exe
