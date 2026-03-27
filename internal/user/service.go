@@ -3,9 +3,7 @@ package user
 import (
 	"errors"
 	"strings"
-	"time"
 
-	"sitchi/configs"
 	"sitchi/configs/db"
 	"sitchi/internal/common"
 
@@ -43,7 +41,6 @@ var (
 	ErrDefaultRoleNotFound     = errors.New("default role not found")
 	ErrUserNotFound            = errors.New("user not found")
 	ErrPasswordMismatch        = errors.New("password mismatch")
-	ErrJWTNotConfigured        = errors.New("jwt not configured")
 )
 
 // CreateUser 创建用户并绑定模块默认角色（module_code:normal），最后刷新用户权限缓存。
@@ -124,11 +121,6 @@ func Login(params LoginParams) (*LoginResult, error) {
 		return nil, ErrInvalidLoginParams
 	}
 
-	jwtSecret := strings.TrimSpace(configs.AppConfig.Auth.JwtSecret)
-	if jwtSecret == "" {
-		return nil, ErrJWTNotConfigured
-	}
-
 	tx, err := db.Pool.Begin()
 	if err != nil {
 		return nil, err
@@ -148,24 +140,12 @@ func Login(params LoginParams) (*LoginResult, error) {
 		return nil, ErrPasswordMismatch
 	}
 
-	ttlMinutes := configs.AppConfig.Auth.TokenTTLMinutes
-	if ttlMinutes <= 0 {
-		ttlMinutes = 60
-	}
-
-	jwtSvc := common.NewJwtAuthService(
-		jwtSecret,
-		"sitchi",
-		time.Duration(ttlMinutes)*time.Minute,
-		time.Duration(ttlMinutes*24*7)*time.Minute,
-	)
-
-	accessToken, err := jwtSvc.GenerateAccessToken(rec.UserID, rec.ModuleCode, rec.Roles)
+	accessToken, err := common.JwtAuth.GenerateAccessToken(rec.UserID, rec.ModuleCode, rec.Roles)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := jwtSvc.GenerateRefreshToken(rec.UserID, rec.ModuleCode)
+	refreshToken, err := common.JwtAuth.GenerateRefreshToken(rec.UserID, rec.ModuleCode)
 	if err != nil {
 		return nil, err
 	}

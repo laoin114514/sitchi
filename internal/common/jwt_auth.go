@@ -2,11 +2,15 @@ package common
 
 import (
 	"errors"
+	"log"
+	"sitchi/configs"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+var JwtAuth *JwtAuthService = NewJwtAuthServiceWithConfig()
 
 type JwtAuthService struct {
 	SecretKey       string
@@ -37,6 +41,14 @@ func NewJwtAuthService(secretKey, issuer string, accessTTL, refreshTTL time.Dura
 		AccessTokenTTL:  accessTTL,
 		RefreshTokenTTL: refreshTTL,
 	}
+}
+
+func NewJwtAuthServiceWithConfig() *JwtAuthService {
+	err := configs.LoadConfig(configs.CheckMode())
+	if err != nil {
+		log.Fatalf("加载配置文件失败: %v", err)
+	}
+	return NewJwtAuthService(configs.AppConfig.Auth.JwtSecret, configs.AppConfig.Auth.Issuer, time.Duration(configs.AppConfig.Auth.AccessTokenTTLMinutes)*time.Minute, time.Duration(configs.AppConfig.Auth.RefreshTokenTTLMinutes)*time.Minute)
 }
 
 func (s *JwtAuthService) GenerateAccessToken(userID int64, moduleCode string, roles []string) (string, error) {
