@@ -1,0 +1,55 @@
+package user
+
+import (
+	"net/http"
+	"strings"
+
+	"sitchi/internal/common/model"
+
+	"github.com/gin-gonic/gin"
+)
+
+type LoginRequest struct {
+	UserCode string `json:"user_code"`
+	Password string `json:"password"`
+}
+
+// LoginController 登录接口：校验账号密码并签发 JWT（access/refresh）。
+func LoginController(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	result, err := Login(LoginParams{
+		ModuleCode: "admin",
+		UserCode:   strings.TrimSpace(req.UserCode),
+		Password:   req.Password,
+	})
+	if err != nil {
+		switch err {
+		case ErrInvalidLoginParams:
+			appErr := model.ErrInvalidParams.WithDetail(err.Error())
+			c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+			return
+		case ErrUserNotFound, ErrPasswordMismatch:
+			appErr := model.ErrUnauthorized.WithDetail("用户名或密码错误")
+			c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+			return
+		default:
+			appErr := model.ErrInternal.WithDetail(err.Error())
+			c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, model.ApiSuccessResponse(gin.H{
+		"user_id":       result.UserID,
+		"module_code":   result.ModuleCode,
+		"roles":         result.Roles,
+		"access_token":  result.AccessToken,
+		"refresh_token": result.RefreshToken,
+	}))
+}

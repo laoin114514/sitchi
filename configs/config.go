@@ -28,8 +28,10 @@ type DbConfig struct {
 }
 
 type AuthConfig struct {
-	JwtSecret       string `yaml:"jwt_secret"`
-	TokenTTLMinutes int    `yaml:"token_ttl_minutes"`
+	JwtSecret              string `yaml:"jwt_secret"`
+	AccessTokenTTLMinutes  int    `yaml:"access_token_ttl_minutes"`
+	RefreshTokenTTLMinutes int    `yaml:"refresh_token_ttl_minutes"`
+	Issuer                 string `yaml:"issuer"`
 }
 
 var AppConfig *Config
@@ -48,6 +50,15 @@ func LoadConfig(path string) error {
 		log.Println("开发模式")
 	} else {
 		log.Println("生产模式")
+	}
+	if config.Auth.AccessTokenTTLMinutes <= 0 {
+		config.Auth.AccessTokenTTLMinutes = 60
+	}
+	if config.Auth.RefreshTokenTTLMinutes <= 0 {
+		config.Auth.RefreshTokenTTLMinutes = 60 * 24 * 7
+	}
+	if config.Auth.Issuer == "" {
+		config.Auth.Issuer = "sitchi"
 	}
 	AppConfig = &config
 	return nil
