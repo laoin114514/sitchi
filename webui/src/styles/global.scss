@@ -1,0 +1,12 @@
+html, body, #app {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
