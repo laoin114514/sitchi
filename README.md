@@ -1,4 +1,4 @@
-# Sitchi 开发规范（团队协作版）
+# Sitchi 开发规范
 
 本文档用于统一后端（Go）与前端（WebUI）开发方式，降低沟通成本，保证代码可维护性。
 
@@ -31,20 +31,52 @@
 
 ## 2. 分层职责规范（后端）
 
+### 2.0 统一代码组织风格
+
+- 除了简单 model/DTO，`controller/service/repository/dao` 全部使用结构体封装。
+- 统一提供 `NewXxx(...)` 构造函数进行依赖注入。
+- 禁止新增包级“业务入口函数”作为主调用方式（兼容旧代码的 wrapper 可保留但不再扩展）。
+
+推荐形态：
+
+```go
+type Service struct {
+    db   *sql.DB
+    repo *Repository
+}
+
+func NewService(db *sql.DB, repo *Repository) *Service { ... }
+func (s *Service) CreateXxx(...) (...) { ... }
+```
+
 ### 2.1 controller
 - 只处理 HTTP 入参/出参与状态码
 - 不写复杂业务逻辑
 - 统一返回 `internal/common/model/api_response.go`
+- 使用结构体封装（如 `type Controller struct { service *Service }`）
+- 路由注册使用实例方法（如 `userController.Login`），避免直接绑定包级函数
 
 ### 2.2 service
 - 负责业务编排、事务边界、规则校验
-- 只调用 repository，不直接写 SQL
-- 跨模块调用优先通过接口，避免循环依赖
+- 只调用 repository/dao，不直接写 SQL
+- 使用结构体封装（`type Service struct {...}`）
+- 事务应在 service 层开启与提交，repository/dao 不自行开启事务
 
 ### 2.3 repository
-- 只负责数据库访问与 SQL
-- 方法命名清晰：`get/insert/update/delete/rebuild...`
+- 只负责模块内数据库访问与 SQL
+- 使用结构体封装（`type Repository struct {...}`）
+- 方法命名清晰：`Get/Insert/Update/Delete/Rebuild...`
 - 尽量参数化查询，禁止字符串拼接 SQL
+
+### 2.4 dao
+- 放“跨模块复用”的通用数据库操作，不放模块专属复杂业务 SQL
+- 使用结构体封装（如 `type ACLDAO struct{}`）
+- 典型场景：
+  - 通用编码构造（`module_code:role_code`）
+  - 通用查询（`GetModuleIDByCode`）
+  - 通用关系写入（`BindUserRole`）
+  - 通用缓存回填（`RebuildUserPermResByUser`）
+- 原则：模块专属逻辑留在模块 repository，通用能力再下沉到 dao
 
 ---
 
