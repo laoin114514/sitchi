@@ -7,6 +7,7 @@ import (
 	"sitchi/configs"
 	"sitchi/configs/db"
 	"sitchi/internal"
+	"sitchi/internal/dao"
 	"sitchi/internal/module"
 	"sitchi/internal/user"
 	"time"
@@ -39,7 +40,11 @@ func initSystem() {
 		adminPassword = os.Args[2]
 	}
 
-	moduleID, err := module.CreateModule(module.CreateModuleParams{
+	aclDAO := dao.NewACLDAO()
+	moduleService := module.NewService(db.Pool, module.NewRepository(aclDAO))
+	userService := user.NewService(db.Pool, user.NewRepository(aclDAO))
+
+	moduleID, err := moduleService.CreateModule(module.CreateModuleParams{
 		UserID:            0,
 		ModuleCode:        "admin",
 		ModuleName:        "管理模块",
@@ -49,7 +54,7 @@ func initSystem() {
 		log.Fatalf("初始化 admin 模块失败: %v", err)
 	}
 
-	adminUserID, err := user.CreateUser(user.CreateUserParams{
+	adminUserID, err := userService.CreateUser(user.CreateUserParams{
 		ModuleCode:  "admin",
 		UserCode:    "admin",
 		UserName:    "管理员",
@@ -61,7 +66,7 @@ func initSystem() {
 		log.Fatalf("创建 admin 账号失败: %v", err)
 	}
 
-	if err = module.SetModuleOwnerAndGrantAdmin("admin", adminUserID); err != nil {
+	if err = moduleService.SetModuleOwnerAndGrantAdmin("admin", adminUserID); err != nil {
 		log.Fatalf("设置 admin 模块 owner 与管理员角色失败: %v", err)
 	}
 

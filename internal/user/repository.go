@@ -2,17 +2,23 @@ package user
 
 import (
 	"database/sql"
-	"fmt"
+
+	"sitchi/internal/dao"
 )
 
-func getModuleIDByCode(tx *sql.Tx, moduleCode string) (int64, error) {
-	var moduleID int64
-	err := tx.QueryRow(`
-		SELECT id
-		FROM modules
-		WHERE module_code = $1
-		  AND is_deleted = FALSE
-	`, moduleCode).Scan(&moduleID)
+type Repository struct {
+	aclDAO *dao.ACLDAO
+}
+
+func NewRepository(aclDAO *dao.ACLDAO) *Repository {
+	if aclDAO == nil {
+		aclDAO = dao.NewACLDAO()
+	}
+	return &Repository{aclDAO: aclDAO}
+}
+
+func (r *Repository) GetModuleIDByCode(tx *sql.Tx, moduleCode string) (int64, error) {
+	moduleID, err := r.aclDAO.GetModuleIDByCode(tx, moduleCode)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return 0, ErrModuleNotFound
@@ -22,7 +28,7 @@ func getModuleIDByCode(tx *sql.Tx, moduleCode string) (int64, error) {
 	return moduleID, nil
 }
 
-func insertUser(tx *sql.Tx, moduleID int64, userCode, userName, description, password, email string) (int64, error) {
+func (r *Repository) InsertUser(tx *sql.Tx, moduleID int64, userCode, userName, description, password, email string) (int64, error) {
 	var userID int64
 	err := tx.QueryRow(`
 		INSERT INTO users (user_code, user_name, description, module_id, password, email)
@@ -35,7 +41,7 @@ func insertUser(tx *sql.Tx, moduleID int64, userCode, userName, description, pas
 	return userID, nil
 }
 
-func insertModuleUser(tx *sql.Tx, moduleID, userID int64, description string) error {
+func (r *Repository) InsertModuleUser(tx *sql.Tx, moduleID, userID int64, description string) error {
 	_, err := tx.Exec(`
 		INSERT INTO module_users (module_id, user_id, description)
 		VALUES ($1, $2, $3)
@@ -43,15 +49,8 @@ func insertModuleUser(tx *sql.Tx, moduleID, userID int64, description string) er
 	return err
 }
 
-func getRoleIDByCode(tx *sql.Tx, moduleID int64, roleCode string) (int64, error) {
-	var roleID int64
-	err := tx.QueryRow(`
-		SELECT id
-		FROM roles
-		WHERE module_id = $1
-		  AND role_code = $2
-		  AND is_deleted = FALSE
-	`, moduleID, roleCode).Scan(&roleID)
+func (r *Repository) GetRoleIDByCode(tx *sql.Tx, moduleID int64, roleCode string) (int64, error) {
+	roleID, err := r.aclDAO.GetRoleIDByCode(tx, moduleID, roleCode)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return 0, ErrDefaultRoleNotFound
@@ -61,38 +60,16 @@ func getRoleIDByCode(tx *sql.Tx, moduleID int64, roleCode string) (int64, error)
 	return roleID, nil
 }
 
-func bindUserRole(tx *sql.Tx, userID, moduleID, roleID int64) error {
-	_, err := tx.Exec(`
-		INSERT INTO user_roles (user_id, module_id, role_id)
-		VALUES ($1, $2, $3)
-	`, userID, moduleID, roleID)
-	return err
+func (r *Repository) BindUserRole(tx *sql.Tx, userID, moduleID, roleID int64) error {
+	return r.aclDAO.BindUserRole(tx, userID, moduleID, roleID)
 }
 
-func rebuildUserPermResByUser(tx *sql.Tx, moduleID, userID int64) error {
-	_, err := tx.Exec(`
-		DELETE FROM user_perm_res
-		WHERE module_id = $1 AND user_id = $2
-	`, moduleID, userID)
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.Exec(`
-		INSERT INTO user_perm_res (module_id, user_id, perm_id, res_id)
-		SELECT DISTINCT ur.module_id, ur.user_id, rpr.perm_id, rpr.res_id
-		FROM user_roles ur
-		JOIN role_permission_resources rpr
-		  ON rpr.module_id = ur.module_id
-		 AND rpr.role_id = ur.role_id
-		WHERE ur.module_id = $1
-		  AND ur.user_id = $2
-	`, moduleID, userID)
-	return err
+func (r *Repository) RebuildUserPermResByUser(tx *sql.Tx, moduleID, userID int64) error {
+	return r.aclDAO.RebuildUserPermResByUser(tx, moduleID, userID)
 }
 
-func moduleRoleCode(moduleCode, roleCode string) string {
-	return fmt.Sprintf("%s:%s", moduleCode, roleCode)
+func (r *Repository) ModuleRoleCode(moduleCode, roleCode string) string {
+	return r.aclDAO.ModuleRoleCode(moduleCode, roleCode)
 }
 
 type UserAuthRecord struct {
@@ -103,7 +80,7 @@ type UserAuthRecord struct {
 	Roles      []string
 }
 
-func getUserAuthRecordByCode(tx *sql.Tx, moduleCode, userCode string) (*UserAuthRecord, error) {
+func (r *Repository) GetUserAuthRecordByCode(tx *sql.Tx, moduleCode, userCode string) (*UserAuthRecord, error) {
 	var rec UserAuthRecord
 	err := tx.QueryRow(`
 		SELECT u.id, m.module_code, u.user_code, u.password

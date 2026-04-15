@@ -1,10 +1,11 @@
 package module
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 
-	"sitchi/configs/db"
+	"sitchi/internal/dao"
 )
 
 type CreateModuleParams struct {
@@ -20,16 +21,20 @@ var (
 	ErrOwnerNotFound    = errors.New("owner user not found")
 )
 
-// CreateModule 创建模块并初始化 ACL 基础数据：
-// 1) modules（owner_user_id = UserID）
-// 2) module_users（加入模块成员）
-// 3) roles（admin/normal）
-// 4) permissions（view/plus/change/delete/bind/unbind）
-// 5) resources（<module_code>:module 根资源 + 固定子资源）
-// 6) 将 owner 绑定到 admin 角色
-// 7) 初始化 admin/normal 默认授权并写入 owner 的 user_perm_res
-func CreateModule(params CreateModuleParams) (int64, error) {
-	if db.Pool == nil {
+type Service struct {
+	db   *sql.DB
+	repo *Repository
+}
+
+func NewService(database *sql.DB, repo *Repository) *Service {
+	if repo == nil {
+		repo = NewRepository(dao.NewACLDAO())
+	}
+	return &Service{db: database, repo: repo}
+}
+
+func (s *Service) CreateModule(params CreateModuleParams) (int64, error) {
+	if s == nil || s.db == nil {
 		return 0, ErrDBNotInitialized
 	}
 
@@ -39,7 +44,7 @@ func CreateModule(params CreateModuleParams) (int64, error) {
 		return 0, ErrInvalidParams
 	}
 
-	tx, err := db.Pool.Begin()
+	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
 	}
@@ -51,49 +56,49 @@ func CreateModule(params CreateModuleParams) (int64, error) {
 
 	ownerUserID := params.UserID
 	if ownerUserID > 0 {
-		if err = ensureOwnerExists(tx, ownerUserID); err != nil {
+		if err = s.repo.EnsureOwnerExists(tx, ownerUserID); err != nil {
 			return 0, err
 		}
 	}
 
-	moduleID, err := insertModule(tx, ownerUserID, moduleCode, moduleName, strings.TrimSpace(params.ModuleDescription))
+	moduleID, err := s.repo.InsertModule(tx, ownerUserID, moduleCode, moduleName, strings.TrimSpace(params.ModuleDescription))
 	if err != nil {
 		return 0, err
 	}
 
 	if ownerUserID > 0 {
-		if err = insertModuleUser(tx, moduleID, ownerUserID); err != nil {
+		if err = s.repo.InsertModuleUser(tx, moduleID, ownerUserID); err != nil {
 			return 0, err
 		}
 	}
 
-	roleIDs, err := insertDefaultRoles(tx, moduleID, moduleCode)
+	roleIDs, err := s.repo.InsertDefaultRoles(tx, moduleID, moduleCode)
 	if err != nil {
 		return 0, err
 	}
 
-	permIDs, err := insertDefaultPermissions(tx, moduleID)
+	permIDs, err := s.repo.InsertDefaultPermissions(tx, moduleID)
 	if err != nil {
 		return 0, err
 	}
 
-	resIDs, err := insertDefaultResources(tx, moduleID, moduleCode)
+	resIDs, err := s.repo.InsertDefaultResources(tx, moduleID, moduleCode)
 	if err != nil {
 		return 0, err
 	}
 
 	if ownerUserID > 0 {
-		if err = bindUserRole(tx, ownerUserID, moduleID, roleIDs[moduleRoleCode(moduleCode, "admin")]); err != nil {
+		if err = s.repo.BindUserRole(tx, ownerUserID, moduleID, roleIDs[s.repo.ModuleRoleCode(moduleCode, "admin")]); err != nil {
 			return 0, err
 		}
 	}
 
-	if err = grantDefaultRolePermissions(tx, moduleID, roleIDs, permIDs, resIDs, moduleCode); err != nil {
+	if err = s.repo.GrantDefaultRolePermissions(tx, moduleID, roleIDs, permIDs, resIDs, moduleCode); err != nil {
 		return 0, err
 	}
 
 	if ownerUserID > 0 {
-		if err = rebuildUserPermResByUser(tx, moduleID, ownerUserID); err != nil {
+		if err = s.repo.RebuildUserPermResByUser(tx, moduleID, ownerUserID); err != nil {
 			return 0, err
 		}
 	}
@@ -105,16 +110,15 @@ func CreateModule(params CreateModuleParams) (int64, error) {
 	return moduleID, nil
 }
 
-// SetModuleOwnerAndGrantAdmin 设置模块 owner，并将该用户加入模块及绑定模块 admin 角色。
-func SetModuleOwnerAndGrantAdmin(moduleCode string, ownerUserID int64) error {
-	if db.Pool == nil {
+func (s *Service) SetModuleOwnerAndGrantAdmin(moduleCode string, ownerUserID int64) error {
+	if s == nil || s.db == nil {
 		return ErrDBNotInitialized
 	}
 	if strings.TrimSpace(moduleCode) == "" || ownerUserID <= 0 {
 		return ErrInvalidParams
 	}
 
-	tx, err := db.Pool.Begin()
+	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
@@ -124,42 +128,42 @@ func SetModuleOwnerAndGrantAdmin(moduleCode string, ownerUserID int64) error {
 		}
 	}()
 
-	if err = ensureOwnerExists(tx, ownerUserID); err != nil {
+	if err = s.repo.EnsureOwnerExists(tx, ownerUserID); err != nil {
 		return err
 	}
 
-	moduleID, err := getModuleIDByCode(tx, moduleCode)
+	moduleID, err := s.repo.GetModuleIDByCode(tx, moduleCode)
 	if err != nil {
 		return err
 	}
 
-	if err = updateModuleOwner(tx, moduleID, ownerUserID); err != nil {
+	if err = s.repo.UpdateModuleOwner(tx, moduleID, ownerUserID); err != nil {
 		return err
 	}
 
-	if err = insertModuleUser(tx, moduleID, ownerUserID); err != nil {
+	if err = s.repo.InsertModuleUser(tx, moduleID, ownerUserID); err != nil {
 		return err
 	}
 
-	superRoleID, err := ensureSuperRole(tx, moduleID, moduleCode)
+	superRoleID, err := s.repo.EnsureSuperRole(tx, moduleID, moduleCode)
 	if err != nil {
 		return err
 	}
 
-	adminRoleID, err := getRoleIDByCode(tx, moduleID, moduleRoleCode(moduleCode, "admin"))
+	adminRoleID, err := s.repo.GetRoleIDByCode(tx, moduleID, s.repo.ModuleRoleCode(moduleCode, "admin"))
 	if err != nil {
 		return err
 	}
 
-	if err = bindUserRole(tx, ownerUserID, moduleID, adminRoleID); err != nil {
+	if err = s.repo.BindUserRole(tx, ownerUserID, moduleID, adminRoleID); err != nil {
 		return err
 	}
 
-	if err = bindUserRole(tx, ownerUserID, moduleID, superRoleID); err != nil {
+	if err = s.repo.BindUserRole(tx, ownerUserID, moduleID, superRoleID); err != nil {
 		return err
 	}
 
-	if err = rebuildUserPermResByUser(tx, moduleID, ownerUserID); err != nil {
+	if err = s.repo.RebuildUserPermResByUser(tx, moduleID, ownerUserID); err != nil {
 		return err
 	}
 

@@ -1,11 +1,12 @@
 package user
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 
-	"sitchi/configs/db"
 	"sitchi/internal/common"
+	"sitchi/internal/dao"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -43,9 +44,20 @@ var (
 	ErrPasswordMismatch        = errors.New("password mismatch")
 )
 
-// CreateUser 创建用户并绑定模块默认角色（module_code:normal），最后刷新用户权限缓存。
-func CreateUser(params CreateUserParams) (int64, error) {
-	if db.Pool == nil {
+type Service struct {
+	db   *sql.DB
+	repo *Repository
+}
+
+func NewService(database *sql.DB, repo *Repository) *Service {
+	if repo == nil {
+		repo = NewRepository(dao.NewACLDAO())
+	}
+	return &Service{db: database, repo: repo}
+}
+
+func (s *Service) CreateUser(params CreateUserParams) (int64, error) {
+	if s == nil || s.db == nil {
 		return 0, ErrDBNotInitialized
 	}
 
@@ -58,7 +70,7 @@ func CreateUser(params CreateUserParams) (int64, error) {
 		return 0, ErrInvalidCreateUserParams
 	}
 
-	tx, err := db.Pool.Begin()
+	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
 	}
@@ -68,7 +80,7 @@ func CreateUser(params CreateUserParams) (int64, error) {
 		}
 	}()
 
-	moduleID, err := getModuleIDByCode(tx, moduleCode)
+	moduleID, err := s.repo.GetModuleIDByCode(tx, moduleCode)
 	if err != nil {
 		return 0, err
 	}
@@ -78,26 +90,26 @@ func CreateUser(params CreateUserParams) (int64, error) {
 		return 0, err
 	}
 
-	userID, err := insertUser(tx, moduleID, userCode, userName, strings.TrimSpace(params.Description), string(hashedPassword), strings.TrimSpace(params.Email))
+	userID, err := s.repo.InsertUser(tx, moduleID, userCode, userName, strings.TrimSpace(params.Description), string(hashedPassword), strings.TrimSpace(params.Email))
 	if err != nil {
 		return 0, err
 	}
 
-	if err = insertModuleUser(tx, moduleID, userID, "模块用户"); err != nil {
+	if err = s.repo.InsertModuleUser(tx, moduleID, userID, "模块用户"); err != nil {
 		return 0, err
 	}
 
-	normalRoleCode := moduleRoleCode(moduleCode, "normal")
-	roleID, err := getRoleIDByCode(tx, moduleID, normalRoleCode)
+	normalRoleCode := s.repo.ModuleRoleCode(moduleCode, "normal")
+	roleID, err := s.repo.GetRoleIDByCode(tx, moduleID, normalRoleCode)
 	if err != nil {
 		return 0, err
 	}
 
-	if err = bindUserRole(tx, userID, moduleID, roleID); err != nil {
+	if err = s.repo.BindUserRole(tx, userID, moduleID, roleID); err != nil {
 		return 0, err
 	}
 
-	if err = rebuildUserPermResByUser(tx, moduleID, userID); err != nil {
+	if err = s.repo.RebuildUserPermResByUser(tx, moduleID, userID); err != nil {
 		return 0, err
 	}
 
@@ -108,9 +120,8 @@ func CreateUser(params CreateUserParams) (int64, error) {
 	return userID, nil
 }
 
-// Login 校验账号密码并签发 access/refresh token。
-func Login(params LoginParams) (*LoginResult, error) {
-	if db.Pool == nil {
+func (s *Service) Login(params LoginParams) (*LoginResult, error) {
+	if s == nil || s.db == nil {
 		return nil, ErrDBNotInitialized
 	}
 
@@ -121,7 +132,7 @@ func Login(params LoginParams) (*LoginResult, error) {
 		return nil, ErrInvalidLoginParams
 	}
 
-	tx, err := db.Pool.Begin()
+	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +142,7 @@ func Login(params LoginParams) (*LoginResult, error) {
 		}
 	}()
 
-	rec, err := getUserAuthRecordByCode(tx, moduleCode, userCode)
+	rec, err := s.repo.GetUserAuthRecordByCode(tx, moduleCode, userCode)
 	if err != nil {
 		return nil, err
 	}

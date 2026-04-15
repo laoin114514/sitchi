@@ -9,6 +9,8 @@ import (
 )
 
 func InitRouter(r *gin.Engine) {
+	userController := user.NewController()
+
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
@@ -19,6 +21,6 @@ func InitRouter(r *gin.Engine) {
 	})
 	webuiApiGroup := r.Group("/api/webui")
 	{
-		webuiApiGroup.POST("/login", user.LoginController)
+		webuiApiGroup.POST("/login", userController.Login)
 	}
 }
