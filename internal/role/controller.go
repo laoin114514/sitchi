@@ -71,7 +71,7 @@ func (ctl *Controller) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, model.ApiSuccessResponse(roleID))
+	c.JSON(http.StatusOK, model.ApiSuccessResponse(gin.H{"role_id": roleID}))
 }
 
 func (ctl *Controller) GetByID(c *gin.Context) {
