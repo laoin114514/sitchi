@@ -2,6 +2,7 @@ package internal
 
 import (
 	"net/http"
+	"sitchi/internal/resource"
 	"sitchi/internal/user"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 func InitRouter(r *gin.Engine) {
 	userController := user.NewController()
+	resourceController := resource.NewController()
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -22,5 +24,12 @@ func InitRouter(r *gin.Engine) {
 	webuiApiGroup := r.Group("/api/webui")
 	{
 		webuiApiGroup.POST("/login", userController.Login)
+
+		// 资源管理接口
+		webuiApiGroup.GET("/resources", resourceController.List)
+		webuiApiGroup.POST("/resources", resourceController.Create)
+		webuiApiGroup.GET("/resources/:id", resourceController.GetByID)
+		webuiApiGroup.PUT("/resources/:id", resourceController.Update)
+		webuiApiGroup.DELETE("/resources/:id", resourceController.Delete)
 	}
 }
