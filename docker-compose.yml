@@ -1,0 +1,14 @@
+
+services:
+  sitchi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sitchi-${MODE:-dev}
+    environment:
+      - MODE=${MODE:-dev}
+    ports:
+      - "${PORT:-5050}:5050"
+    volumes:
+      - ./configs:/app/configs:ro
+    restart: unless-stopped
