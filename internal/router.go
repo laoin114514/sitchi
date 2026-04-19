@@ -26,10 +26,13 @@ func InitRouter(r *gin.Engine) {
 		webuiApiGroup.POST("/login", userController.Login)
 
 		// 角色CRUD
-		webuiApiGroup.POST("/roles", roleController.Create)
-		webuiApiGroup.GET("/roles", roleController.GetListByID)
-		webuiApiGroup.GET("/roles/:id", roleController.GetByID)
-		webuiApiGroup.POST("/roles/update/:id", roleController.Update)
-		webuiApiGroup.POST("/roles/delete/:id", roleController.Delete)
+		roleGroup := webuiApiGroup.Group("/roles")
+		{
+			roleGroup.GET("/list", roleController.GetListByID)
+			roleGroup.GET("/detail/:id", roleController.GetByID)
+			roleGroup.POST("/create", roleController.Create)
+			roleGroup.POST("/update", roleController.Update)
+			roleGroup.POST("/delete", roleController.Delete)
+		}
 	}
 }
