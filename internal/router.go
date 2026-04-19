@@ -2,6 +2,8 @@ package internal
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	perm "sitchi/internal/permission"
 	"sitchi/internal/role"
 	"sitchi/internal/user"
@@ -41,4 +43,38 @@ func InitRouter(r *gin.Engine) {
 		webuiApiGroup.PUT("/permissions/:id", permController.Update)
 		webuiApiGroup.DELETE("/permissions/:id", permController.Delete)
 	}
+
+	// 提供前端静态文件服务
+	setupStaticFiles(r)
+}
+
+// setupStaticFiles 配置前端静态文件服务
+func setupStaticFiles(r *gin.Engine) {
+	// 检查前端构建目录是否存在
+	webuiDist := "./webui/dist"
+	if _, err := os.Stat(webuiDist); os.IsNotExist(err) {
+		// 前端目录不存在，跳过静态文件服务
+		return
+	}
+
+	// 提供静态文件服务
+	r.Static("/assets", filepath.Join(webuiDist, "assets"))
+	r.StaticFile("/favicon.ico", filepath.Join(webuiDist, "favicon.ico"))
+
+	// 所有非API请求都返回 index.html（支持前端路由）
+	r.NoRoute(func(c *gin.Context) {
+		// API 请求不处理
+		if len(c.Request.URL.Path) >= 4 && c.Request.URL.Path[:4] == "/api" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "API not found"})
+			return
+		}
+
+		// 返回前端入口文件
+		indexPath := filepath.Join(webuiDist, "index.html")
+		if _, err := os.Stat(indexPath); err == nil {
+			c.File(indexPath)
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Page not found"})
+		}
+	})
 }
