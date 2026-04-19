@@ -40,8 +40,8 @@ func InitRouter(r *gin.Engine) {
 		webuiApiGroup.POST("/permissions", permController.Create)
 		webuiApiGroup.GET("/permissions", permController.GetListByID)
 		webuiApiGroup.GET("/permissions/:id", permController.GetByID)
-		webuiApiGroup.PUT("/permissions/:id", permController.Update)
-		webuiApiGroup.DELETE("/permissions/:id", permController.Delete)
+		webuiApiGroup.POST("/permissions/update/:id", permController.Update)
+		webuiApiGroup.POST("/permissions/delete/:id", permController.Delete)
 	}
 
 	// 提供前端静态文件服务
