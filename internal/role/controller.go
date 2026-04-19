@@ -22,8 +22,15 @@ type CreateRoleRequest struct {
 }
 
 type UpdateRoleRequest struct {
+	ModuleCode  string `json:"module_code"`
+	RoleID      int64  `json:"role_id"`
 	RoleCode    string `json:"role_code"`
 	Description string `json:"description"`
+}
+
+type DeleteRoleRequest struct {
+	ModuleCode string `json:"module_code"`
+	RoleID     int64  `json:"role_id"`
 }
 
 func NewController() *Controller {
@@ -128,24 +135,16 @@ func (ctl *Controller) Update(c *gin.Context) {
 		return
 	}
 
-	moduleCode := strings.TrimSpace(c.Query("module_code"))
-	roleID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if moduleCode == "" || err != nil || roleID <= 0 {
-		appErr := model.ErrInvalidParams.WithDetail("module_code and valid id are required")
-		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
-		return
-	}
-
 	var req UpdateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		appErr := model.ErrInvalidParams.WithDetail("invalid request body")
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
 		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
 		return
 	}
 
 	svcErr := ctl.service.Update(UpdateRoleParams{
-		ModuleCode:  moduleCode,
-		RoleID:      roleID,
+		ModuleCode:  req.ModuleCode,
+		RoleID:      req.RoleID,
 		RoleCode:    req.RoleCode,
 		Description: req.Description,
 	})
@@ -164,15 +163,14 @@ func (ctl *Controller) Delete(c *gin.Context) {
 		return
 	}
 
-	moduleCode := strings.TrimSpace(c.Query("module_code"))
-	roleID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if moduleCode == "" || err != nil || roleID <= 0 {
-		appErr := model.ErrInvalidParams.WithDetail("module_code and valid id are required")
+	var req DeleteRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
 		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
 		return
 	}
 
-	svcErr := ctl.service.Delete(moduleCode, roleID)
+	svcErr := ctl.service.Delete(req.ModuleCode, req.RoleID)
 	if svcErr != nil {
 		ctl.handleError(c, svcErr)
 		return

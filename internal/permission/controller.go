@@ -23,9 +23,16 @@ type CreatePermRequest struct {
 }
 
 type UpdatePermRequest struct {
+	ModuleCode  string `json:"module_code"`
+	PermID      int64  `json:"perm_id"`
 	PermCode    string `json:"perm_code"`
 	PermName    string `json:"perm_name"`
 	Description string `json:"description"`
+}
+
+type DeletePermRequest struct {
+	ModuleCode string `json:"module_code"`
+	PermID     int64  `json:"perm_id"`
 }
 
 func NewController() *Controller {
@@ -130,24 +137,16 @@ func (ctl *Controller) Update(c *gin.Context) {
 		return
 	}
 
-	moduleCode := strings.TrimSpace(c.Query("module_code"))
-	permID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if moduleCode == "" || err != nil || permID <= 0 {
-		appErr := model.ErrInvalidParams.WithDetail("module_code and valid id are required")
-		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
-		return
-	}
-
 	var req UpdatePermRequest
-	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
-		appErr := model.ErrInvalidParams.WithDetail(bindErr.Error())
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
 		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
 		return
 	}
 
 	svcErr := ctl.service.Update(UpdatePermParams{
-		ModuleCode:  moduleCode,
-		PermID:      permID,
+		ModuleCode:  req.ModuleCode,
+		PermID:      req.PermID,
 		PermCode:    req.PermCode,
 		PermName:    req.PermName,
 		Description: req.Description,
@@ -167,15 +166,14 @@ func (ctl *Controller) Delete(c *gin.Context) {
 		return
 	}
 
-	moduleCode := strings.TrimSpace(c.Query("module_code"))
-	permID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if moduleCode == "" || err != nil || permID <= 0 {
-		appErr := model.ErrInvalidParams.WithDetail("module_code and valid id are required")
+	var req DeletePermRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
 		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
 		return
 	}
 
-	svcErr := ctl.service.Delete(moduleCode, permID)
+	svcErr := ctl.service.Delete(req.ModuleCode, req.PermID)
 	if svcErr != nil {
 		ctl.handleError(c, svcErr)
 		return

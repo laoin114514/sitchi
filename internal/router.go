@@ -30,18 +30,24 @@ func InitRouter(r *gin.Engine) {
 		webuiApiGroup.POST("/login", userController.Login)
 
 		// 角色CRUD
-		webuiApiGroup.POST("/roles", roleController.Create)
-		webuiApiGroup.GET("/roles", roleController.GetListByID)
-		webuiApiGroup.GET("/roles/:id", roleController.GetByID)
-		webuiApiGroup.POST("/roles/update/:id", roleController.Update)
-		webuiApiGroup.POST("/roles/delete/:id", roleController.Delete)
+		roleGroup := webuiApiGroup.Group("/roles")
+		{
+			roleGroup.GET("/list", roleController.GetListByID)
+			roleGroup.GET("/detail/:id", roleController.GetByID)
+			roleGroup.POST("/create", roleController.Create)
+			roleGroup.POST("/update", roleController.Update)
+			roleGroup.POST("/delete", roleController.Delete)
+		}
 
 		// 权限CRUD
-		webuiApiGroup.POST("/permissions", permController.Create)
-		webuiApiGroup.GET("/permissions", permController.GetListByID)
-		webuiApiGroup.GET("/permissions/:id", permController.GetByID)
-		webuiApiGroup.POST("/permissions/update/:id", permController.Update)
-		webuiApiGroup.POST("/permissions/delete/:id", permController.Delete)
+		permGroup := webuiApiGroup.Group("/permissions")
+		{
+			permGroup.GET("/list", permController.GetListByID)
+			permGroup.GET("/detail/:id", permController.GetByID)
+			permGroup.POST("/create", permController.Create)
+			permGroup.POST("/update", permController.Update)
+			permGroup.POST("/delete", permController.Delete)
+		}
 	}
 
 	// 提供前端静态文件服务
