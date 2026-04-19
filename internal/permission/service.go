@@ -139,7 +139,7 @@ func (s *Service) GetListByID(moduleCode string) ([]*Permission, error) {
 		return nil, err
 	}
 
-	permList, err := s.repo.GetPermList(tx, moduleID)
+	permList, err := s.repo.GetPermListByID(tx, moduleID)
 	if err != nil {
 		return nil, err
 	}

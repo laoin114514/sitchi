@@ -16,8 +16,8 @@ type Permission struct {
 	PermName    string `json:"perm_name"`
 	Description string `json:"description"`
 	IsActive    bool   `json:"is_active"`
-	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+	CreatedAt   string `json:"created_at"`
 }
 
 func NewRepository(aclDAO *dao.ACLDAO) *Repository {
@@ -41,11 +41,11 @@ func (r *Repository) GetModuleIDByCode(tx *sql.Tx, moduleCode string) (int64, er
 func (r *Repository) GetPermByID(tx *sql.Tx, moduleID, permID int64) (*Permission, error) {
 	var p Permission
 	err := tx.QueryRow(`
-		SELECT id, module_id, perm_code, perm_name, COALESCE(description,''), is_active, created_at, updated_at
+		SELECT id, module_id, perm_code, perm_name, COALESCE(description,''), is_active, updated_at, created_at
 		FROM permissions
-		WHERE module_id = $1 AND id = $2 AND is_deleted = FALSE
+		WHERE module_id = $1 AND id = $2 AND is_deleted=FALSE
 	`, moduleID, permID).Scan(
-		&p.ID, &p.ModuleID, &p.PermCode, &p.PermName, &p.Description, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
+		&p.ID, &p.ModuleID, &p.PermCode, &p.PermName, &p.Description, &p.IsActive, &p.UpdatedAt, &p.CreatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -56,11 +56,11 @@ func (r *Repository) GetPermByID(tx *sql.Tx, moduleID, permID int64) (*Permissio
 	return &p, nil
 }
 
-func (r *Repository) GetPermList(tx *sql.Tx, moduleID int64) ([]*Permission, error) {
+func (r *Repository) GetPermListByID(tx *sql.Tx, moduleID int64) ([]*Permission, error) {
 	rows, err := tx.Query(`
-		SELECT id, module_id, perm_code, perm_name, COALESCE(description,''), is_active, created_at, updated_at
+		SELECT id, module_id, perm_code, perm_name, COALESCE(description,''), is_active, updated_at, created_at
 		FROM permissions
-		WHERE module_id = $1 AND is_deleted = FALSE
+		WHERE module_id = $1 AND is_deleted=FALSE
 	`, moduleID)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (r *Repository) GetPermList(tx *sql.Tx, moduleID int64) ([]*Permission, err
 	for rows.Next() {
 		var p Permission
 		err := rows.Scan(
-			&p.ID, &p.ModuleID, &p.PermCode, &p.PermName, &p.Description, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
+			&p.ID, &p.ModuleID, &p.PermCode, &p.PermName, &p.Description, &p.IsActive, &p.UpdatedAt, &p.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
