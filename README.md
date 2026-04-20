@@ -56,6 +56,41 @@ func (s *Service) CreateXxx(...) (...) { ... }
 - 使用结构体封装（如 `type Controller struct { service *Service }`）
 - 路由注册使用实例方法（如 `userController.Login`），避免直接绑定包级函数
 
+### 2.1.1 HTTP 方法与路由命名规范（2026/4/17新增）
+
+- 全项目接口仅允许使用 `GET` 与 `POST`。
+- 禁止使用 `PUT`、`PATCH`、`DELETE`（统一由 `POST` 承担写操作）。
+- 路由命名必须体现显式操作语义，避免仅依赖 HTTP 动词表达含义。
+- 推荐按模块使用 `gin.Group` 做路由分组（如 `/auth`、`/user`、`/role`），提升可读性与可维护性。
+
+推荐命名：
+- 查询列表：`GET /xxx/list`
+- 查询详情：`GET /xxx/detail`
+- 新增：`POST /xxx/create`
+- 更新：`POST /xxx/update`
+- 删除：`POST /xxx/delete`
+- 登录：`POST /auth/login`
+- 健康检查：`GET /health`
+
+命名要求：
+- 使用小写英文、短横线或下划线风格保持统一（项目内统一一种）
+- 不使用模糊路径（如 `/do`、`/handle`、`/action`）
+- 同一资源的动作命名必须一致（如统一 `list/detail/create/update/delete`）
+- 分组内继续保持动作后缀风格统一（如 `Get /user/list`、`POST /user/create`）
+
+分组示例：
+
+```go
+userGroup := r.Group("/user")
+{
+    userGroup.POST("/list", userController.List)
+    userGroup.POST("/detail", userController.Detail)
+    userGroup.POST("/create", userController.Create)
+    userGroup.POST("/update", userController.Update)
+    userGroup.POST("/delete", userController.Delete)
+}
+```
+
 ### 2.2 service
 - 负责业务编排、事务边界、规则校验
 - 只调用 repository/dao，不直接写 SQL
