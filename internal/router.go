@@ -5,6 +5,8 @@ import (
 	"sitchi/internal/role"
 	"os"
 	"path/filepath"
+	perm "sitchi/internal/permission"
+	"sitchi/internal/role"
 	"sitchi/internal/user"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 func InitRouter(r *gin.Engine) {
 	userController := user.NewController()
 	roleController := role.NewController()
+	permController := perm.NewController()
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -35,6 +38,16 @@ func InitRouter(r *gin.Engine) {
 			roleGroup.POST("/create", roleController.Create)
 			roleGroup.POST("/update", roleController.Update)
 			roleGroup.POST("/delete", roleController.Delete)
+		}
+
+		// 权限CRUD
+		permGroup := webuiApiGroup.Group("/permissions")
+		{
+			permGroup.GET("/list", permController.GetListByID)
+			permGroup.GET("/detail/:id", permController.GetByID)
+			permGroup.POST("/create", permController.Create)
+			permGroup.POST("/update", permController.Update)
+			permGroup.POST("/delete", permController.Delete)
 		}
 	}
 
