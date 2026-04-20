@@ -2,6 +2,7 @@ package internal
 
 import (
 	"net/http"
+	"sitchi/internal/role"
 	"os"
 	"path/filepath"
 	"sitchi/internal/user"
@@ -12,6 +13,7 @@ import (
 
 func InitRouter(r *gin.Engine) {
 	userController := user.NewController()
+	roleController := role.NewController()
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -24,6 +26,16 @@ func InitRouter(r *gin.Engine) {
 	webuiApiGroup := r.Group("/api/webui")
 	{
 		webuiApiGroup.POST("/login", userController.Login)
+
+		// 角色CRUD
+		roleGroup := webuiApiGroup.Group("/roles")
+		{
+			roleGroup.GET("/list", roleController.GetListByID)
+			roleGroup.GET("/detail/:id", roleController.GetByID)
+			roleGroup.POST("/create", roleController.Create)
+			roleGroup.POST("/update", roleController.Update)
+			roleGroup.POST("/delete", roleController.Delete)
+		}
 	}
 
 	// 提供前端静态文件服务
