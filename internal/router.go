@@ -21,15 +21,20 @@ func InitRouter(r *gin.Engine) {
 			"time":    time.Now().Format("2006-01-02 15:04:05"),
 		})
 	})
+
+	// WebUI API 分组
 	webuiApiGroup := r.Group("/api/webui")
 	{
 		webuiApiGroup.POST("/login", userController.Login)
 
-		// 资源管理接口
-		webuiApiGroup.GET("/resources", resourceController.List)
-		webuiApiGroup.POST("/resources", resourceController.Create)
-		webuiApiGroup.GET("/resources/:id", resourceController.GetByID)
-		webuiApiGroup.PUT("/resources/:id", resourceController.Update)
-		webuiApiGroup.DELETE("/resources/:id", resourceController.Delete)
+		// 资源管理路由组
+		resourceGroup := webuiApiGroup.Group("/resources")
+		{
+			resourceGroup.GET("/list", resourceController.List)
+			resourceGroup.POST("/create", resourceController.Create)
+			resourceGroup.POST("/detail", resourceController.GetByID)
+			resourceGroup.POST("/update", resourceController.Update)
+			resourceGroup.POST("/delete", resourceController.Delete)
+		}
 	}
 }

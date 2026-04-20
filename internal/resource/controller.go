@@ -34,6 +34,7 @@ type CreateRequest struct {
 
 // UpdateRequest 更新资源请求
 type UpdateRequest struct {
+	ResourceID  int64  `json:"resource_id" binding:"required"`
 	ResName     string `json:"res_name" binding:"required"`
 	ResType     string `json:"res_type" binding:"required"`
 	ParentID    *int64 `json:"parent_id"`
@@ -41,8 +42,18 @@ type UpdateRequest struct {
 	Description string `json:"description"`
 }
 
+// DeleteRequest 删除资源请求
+type DeleteRequest struct {
+	ResourceID int64 `json:"resource_id" binding:"required"`
+}
+
+// GetByIDRequest 获取资源详情请求
+type GetByIDRequest struct {
+	ResourceID int64 `json:"resource_id" binding:"required"`
+}
+
 // Create 创建资源接口
-// POST /api/webui/resources
+// POST /api/webui/resources/create
 func (ctl *Controller) Create(c *gin.Context) {
 	if ctl == nil || ctl.service == nil {
 		appErr := model.ErrInternal.WithDetail("resource controller not initialized")
@@ -96,18 +107,10 @@ func (ctl *Controller) Create(c *gin.Context) {
 }
 
 // Update 更新资源接口
-// PUT /api/webui/resources/:id
+// POST /api/webui/resources/update
 func (ctl *Controller) Update(c *gin.Context) {
 	if ctl == nil || ctl.service == nil {
 		appErr := model.ErrInternal.WithDetail("resource controller not initialized")
-		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
-		return
-	}
-
-	// 获取资源ID
-	resourceID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		appErr := model.ErrInvalidParams.WithDetail("无效的资源ID")
 		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
 		return
 	}
@@ -125,8 +128,8 @@ func (ctl *Controller) Update(c *gin.Context) {
 		moduleCode = "admin"
 	}
 
-	err = ctl.service.Update(UpdateResourceParams{
-		ResourceID:  resourceID,
+	err := ctl.service.Update(UpdateResourceParams{
+		ResourceID:  req.ResourceID,
 		ModuleCode:  moduleCode.(string),
 		ResName:     req.ResName,
 		ResType:     req.ResType,
@@ -157,7 +160,7 @@ func (ctl *Controller) Update(c *gin.Context) {
 }
 
 // Delete 删除资源接口
-// DELETE /api/webui/resources/:id
+// POST /api/webui/resources/delete
 func (ctl *Controller) Delete(c *gin.Context) {
 	if ctl == nil || ctl.service == nil {
 		appErr := model.ErrInternal.WithDetail("resource controller not initialized")
@@ -165,10 +168,9 @@ func (ctl *Controller) Delete(c *gin.Context) {
 		return
 	}
 
-	// 获取资源ID
-	resourceID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		appErr := model.ErrInvalidParams.WithDetail("无效的资源ID")
+	var req DeleteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
 		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
 		return
 	}
@@ -179,7 +181,7 @@ func (ctl *Controller) Delete(c *gin.Context) {
 		moduleCode = "admin"
 	}
 
-	err = ctl.service.Delete(resourceID, moduleCode.(string))
+	err := ctl.service.Delete(req.ResourceID, moduleCode.(string))
 	if err != nil {
 		switch err {
 		case ErrInvalidParams:
@@ -203,7 +205,7 @@ func (ctl *Controller) Delete(c *gin.Context) {
 }
 
 // GetByID 获取资源详情接口
-// GET /api/webui/resources/:id
+// POST /api/webui/resources/detail
 func (ctl *Controller) GetByID(c *gin.Context) {
 	if ctl == nil || ctl.service == nil {
 		appErr := model.ErrInternal.WithDetail("resource controller not initialized")
@@ -211,10 +213,9 @@ func (ctl *Controller) GetByID(c *gin.Context) {
 		return
 	}
 
-	// 获取资源ID
-	resourceID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		appErr := model.ErrInvalidParams.WithDetail("无效的资源ID")
+	var req GetByIDRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
 		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
 		return
 	}
@@ -225,7 +226,7 @@ func (ctl *Controller) GetByID(c *gin.Context) {
 		moduleCode = "admin"
 	}
 
-	resource, err := ctl.service.GetByID(resourceID, moduleCode.(string))
+	resource, err := ctl.service.GetByID(req.ResourceID, moduleCode.(string))
 	if err != nil {
 		switch err {
 		case ErrInvalidParams:
@@ -247,7 +248,7 @@ func (ctl *Controller) GetByID(c *gin.Context) {
 }
 
 // List 获取资源列表接口
-// GET /api/webui/resources
+// GET /api/webui/resources/list
 func (ctl *Controller) List(c *gin.Context) {
 	if ctl == nil || ctl.service == nil {
 		appErr := model.ErrInternal.WithDetail("resource controller not initialized")
