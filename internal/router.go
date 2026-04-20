@@ -2,6 +2,7 @@ package internal
 
 import (
 	"net/http"
+	"sitchi/internal/role"
 	"os"
 	"path/filepath"
 	perm "sitchi/internal/permission"

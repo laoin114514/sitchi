@@ -64,8 +64,8 @@ func (s *Service) CreateXxx(...) (...) { ... }
 - 推荐按模块使用 `gin.Group` 做路由分组（如 `/auth`、`/user`、`/role`），提升可读性与可维护性。
 
 推荐命名：
-- 查询列表：`POST /xxx/list`
-- 查询详情：`POST /xxx/detail`
+- 查询列表：`GET /xxx/list`
+- 查询详情：`GET /xxx/detail`
 - 新增：`POST /xxx/create`
 - 更新：`POST /xxx/update`
 - 删除：`POST /xxx/delete`
@@ -76,7 +76,7 @@ func (s *Service) CreateXxx(...) (...) { ... }
 - 使用小写英文、短横线或下划线风格保持统一（项目内统一一种）
 - 不使用模糊路径（如 `/do`、`/handle`、`/action`）
 - 同一资源的动作命名必须一致（如统一 `list/detail/create/update/delete`）
-- 分组内继续保持动作后缀风格统一（如 `POST /user/list`、`POST /user/create`）
+- 分组内继续保持动作后缀风格统一（如 `Get /user/list`、`POST /user/create`）
 
 分组示例：
 
