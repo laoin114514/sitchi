@@ -8,6 +8,20 @@ import (
 	"sitchi/internal/dao"
 )
 
+// GetModulesParams 查询模块列表参数
+type GetModulesParams struct {
+	Page     int               `json:"page"`
+	PageSize int               `json:"page_size"`
+	Filters  map[string]string `json:"filters"`
+}
+
+// UpdateModuleParams 更新模块参数
+type UpdateModuleParams struct {
+	ModuleID    int64  `json:"module_id"`
+	ModuleName  string `json:"module_name"`
+	Description string `json:"description"`
+}
+
 type CreateModuleParams struct {
 	UserID            int64
 	ModuleCode        string
@@ -164,6 +178,159 @@ func (s *Service) SetModuleOwnerAndGrantAdmin(moduleCode string, ownerUserID int
 	}
 
 	if err = s.repo.RebuildUserPermResByUser(tx, moduleID, ownerUserID); err != nil {
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) GetModules(params GetModulesParams) ([]Module, int64, error) {
+	if s == nil || s.db == nil {
+		return nil, 0, ErrDBNotInitialized
+	}
+
+	// 设置默认值
+	if params.Page <= 0 {
+		params.Page = 1
+	}
+	if params.PageSize <= 0 || params.PageSize > 100 {
+		params.PageSize = 10
+	}
+
+	// 转换过滤条件
+	filters := make(map[string]interface{})
+	if params.Filters != nil {
+		for k, v := range params.Filters {
+			filters[k] = v
+		}
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback()
+
+	modules, total, err := s.repo.GetModules(tx, params.Page, params.PageSize, filters)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return modules, total, nil
+}
+
+func (s *Service) GetModuleByID(moduleID int64) (Module, error) {
+	if s == nil || s.db == nil {
+		return Module{}, ErrDBNotInitialized
+	}
+	if moduleID <= 0 {
+		return Module{}, ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return Module{}, err
+	}
+	defer tx.Rollback()
+
+	module, err := s.repo.GetModuleByID(tx, moduleID)
+	if err != nil {
+		return Module{}, err
+	}
+
+	return module, nil
+}
+
+func (s *Service) GetModuleByCode(moduleCode string) (Module, error) {
+	if s == nil || s.db == nil {
+		return Module{}, ErrDBNotInitialized
+	}
+	if strings.TrimSpace(moduleCode) == "" {
+		return Module{}, ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return Module{}, err
+	}
+	defer tx.Rollback()
+
+	module, err := s.repo.GetModuleByCode(tx, moduleCode)
+	if err != nil {
+		return Module{}, err
+	}
+
+	return module, nil
+}
+
+func (s *Service) UpdateModule(params UpdateModuleParams) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+	if params.ModuleID <= 0 || strings.TrimSpace(params.ModuleName) == "" {
+		return ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	// 验证模块是否存在
+	_, err = s.repo.GetModuleByID(tx, params.ModuleID)
+	if err != nil {
+		return err
+	}
+
+	// 更新模块信息
+	err = s.repo.UpdateModule(tx, params.ModuleID, strings.TrimSpace(params.ModuleName), strings.TrimSpace(params.Description))
+	if err != nil {
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) DeleteModule(moduleID int64) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+	if moduleID <= 0 {
+		return ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	// 验证模块是否存在
+	_, err = s.repo.GetModuleByID(tx, moduleID)
+	if err != nil {
+		return err
+	}
+
+	// 软删除模块
+	err = s.repo.DeleteModule(tx, moduleID)
+	if err != nil {
 		return err
 	}
 

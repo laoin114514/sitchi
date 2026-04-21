@@ -276,3 +276,116 @@ func (r *Repository) EnsureSuperRole(tx *sql.Tx, moduleID int64, moduleCode stri
 
 	return roleID, nil
 }
+
+func (r *Repository) GetModules(tx *sql.Tx, page, pageSize int, filters map[string]interface{}) ([]Module, int64, error) {
+	// 构建查询SQL
+	query := `
+		SELECT id, module_code, module_name, description, owner_user_id, created_at, updated_at, is_deleted
+		FROM modules
+		WHERE is_deleted = FALSE
+	`
+	countQuery := `
+		SELECT COUNT(*)
+		FROM modules
+		WHERE is_deleted = FALSE
+	`
+
+	// 添加筛选条件
+	args := []interface{}{}
+	argIndex := 1
+
+	if moduleName, ok := filters["module_name"].(string); ok && moduleName != "" {
+		query += fmt.Sprintf(" AND module_name ILIKE $%d", argIndex)
+		countQuery += fmt.Sprintf(" AND module_name ILIKE $%d", argIndex)
+		args = append(args, "%"+moduleName+"%")
+		argIndex++
+	}
+
+	if moduleCode, ok := filters["module_code"].(string); ok && moduleCode != "" {
+		query += fmt.Sprintf(" AND module_code ILIKE $%d", argIndex)
+		countQuery += fmt.Sprintf(" AND module_code ILIKE $%d", argIndex)
+		args = append(args, "%"+moduleCode+"%")
+		argIndex++
+	}
+
+	// 计算分页参数
+	offset := (page - 1) * pageSize
+
+	// 添加分页
+	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
+	args = append(args, pageSize, offset)
+
+	// 查询总数
+	var total int64
+	err := tx.QueryRow(countQuery, args[:len(args)-2]...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 查询数据
+	rows, err := tx.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	modules := []Module{}
+	for rows.Next() {
+		var m Module
+		err := rows.Scan(&m.ID, &m.ModuleCode, &m.ModuleName, &m.Description, &m.OwnerUserID, &m.CreatedAt, &m.UpdatedAt, &m.IsDeleted)
+		if err != nil {
+			return nil, 0, err
+		}
+		modules = append(modules, m)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return modules, total, nil
+}
+
+func (r *Repository) GetModuleByID(tx *sql.Tx, moduleID int64) (Module, error) {
+	var m Module
+	err := tx.QueryRow(`
+		SELECT id, module_code, module_name, description, owner_user_id, created_at, updated_at, is_deleted
+		FROM modules
+		WHERE id = $1 AND is_deleted = FALSE
+	`, moduleID).Scan(&m.ID, &m.ModuleCode, &m.ModuleName, &m.Description, &m.OwnerUserID, &m.CreatedAt, &m.UpdatedAt, &m.IsDeleted)
+	if err != nil {
+		return Module{}, err
+	}
+	return m, nil
+}
+
+func (r *Repository) GetModuleByCode(tx *sql.Tx, moduleCode string) (Module, error) {
+	var m Module
+	err := tx.QueryRow(`
+		SELECT id, module_code, module_name, description, owner_user_id, created_at, updated_at, is_deleted
+		FROM modules
+		WHERE module_code = $1 AND is_deleted = FALSE
+	`, moduleCode).Scan(&m.ID, &m.ModuleCode, &m.ModuleName, &m.Description, &m.OwnerUserID, &m.CreatedAt, &m.UpdatedAt, &m.IsDeleted)
+	if err != nil {
+		return Module{}, err
+	}
+	return m, nil
+}
+
+func (r *Repository) UpdateModule(tx *sql.Tx, moduleID int64, moduleName, description string) error {
+	_, err := tx.Exec(`
+		UPDATE modules
+		SET module_name = $1, description = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $3 AND is_deleted = FALSE
+	`, moduleName, description, moduleID)
+	return err
+}
+
+func (r *Repository) DeleteModule(tx *sql.Tx, moduleID int64) error {
+	_, err := tx.Exec(`
+		UPDATE modules
+		SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND is_deleted = FALSE
+	`, moduleID)
+	return err
+}
