@@ -28,6 +28,7 @@ func InitRouter(r *gin.Engine) {
 	webuiApiGroup := r.Group("/api/webui")
 	{
 		webuiApiGroup.POST("/login", userController.Login)
+		webuiApiGroup.POST("/refresh", userController.RefreshToken)
 
 		// 用户CRUD
 		userGroup := webuiApiGroup.Group("/users")

@@ -51,6 +51,7 @@ var (
 	ErrDefaultRoleNotFound     = errors.New("default role not found")
 	ErrUserNotFound            = errors.New("user not found")
 	ErrPasswordMismatch        = errors.New("password mismatch")
+	ErrInvalidRefreshToken     = errors.New("invalid or expired refresh token")
 )
 
 type Service struct {
@@ -181,6 +182,67 @@ func (s *Service) Login(params LoginParams) (*LoginResult, error) {
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		Roles:        rec.Roles,
+	}, nil
+}
+
+func (s *Service) RefreshToken(refreshTokenStr string) (*LoginResult, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrDBNotInitialized
+	}
+
+	claims, err := common.JwtAuth.ParseAndVerifyRefreshToken(refreshTokenStr)
+	if err != nil {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	moduleID, err := s.repo.GetModuleIDByCode(tx, claims.ModuleCode)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.repo.GetUserByID(tx, moduleID, claims.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if !user.IsActive {
+		return nil, ErrUserNotFound
+	}
+
+	roles, err := s.repo.GetUserRolesByID(tx, moduleID, claims.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	accessToken, err := common.JwtAuth.GenerateAccessToken(claims.UserID, claims.ModuleCode, roles)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := common.JwtAuth.GenerateRefreshToken(claims.UserID, claims.ModuleCode)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &LoginResult{
+		UserID:       claims.UserID,
+		ModuleCode:   claims.ModuleCode,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		Roles:        roles,
 	}, nil
 }
 

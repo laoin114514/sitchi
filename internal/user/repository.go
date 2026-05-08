@@ -80,6 +80,31 @@ func (r *Repository) UnbindUserRole(tx *sql.Tx, userID, moduleID, roleID int64) 
 	return r.aclDAO.UnbindUserRole(tx, userID, moduleID, roleID)
 }
 
+func (r *Repository) GetUserRolesByID(tx *sql.Tx, moduleID, userID int64) ([]string, error) {
+	rows, err := tx.Query(`
+		SELECT r.role_code
+		FROM user_roles ur
+		JOIN roles r ON r.id = ur.role_id AND r.module_id = ur.module_id
+		WHERE ur.module_id = $1
+		  AND ur.user_id = $2
+		  AND r.is_deleted = FALSE
+	`, moduleID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	roles := make([]string, 0)
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return nil, err
+		}
+		roles = append(roles, role)
+	}
+	return roles, rows.Err()
+}
+
 func (r *Repository) RebuildUserPermResByUser(tx *sql.Tx, moduleID, userID int64) error {
 	return r.aclDAO.RebuildUserPermResByUser(tx, moduleID, userID)
 }

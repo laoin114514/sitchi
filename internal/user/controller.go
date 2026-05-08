@@ -55,6 +55,10 @@ type BindRoleRequest struct {
 	RoleID     int64  `json:"role_id"`
 }
 
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
 // Login 登录接口：校验账号密码并签发 JWT（access/refresh）。
 func (ctl *Controller) Login(c *gin.Context) {
 	if ctl == nil || ctl.service == nil {
@@ -90,6 +94,46 @@ func (ctl *Controller) Login(c *gin.Context) {
 			c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
 			return
 		}
+	}
+
+	c.JSON(http.StatusOK, model.ApiSuccessResponse(gin.H{
+		"user_id":       result.UserID,
+		"module_code":   result.ModuleCode,
+		"roles":         result.Roles,
+		"access_token":  result.AccessToken,
+		"refresh_token": result.RefreshToken,
+	}))
+}
+
+// RefreshToken 刷新接口：使用 refresh token 换取新的 access/refresh token。
+func (ctl *Controller) RefreshToken(c *gin.Context) {
+	if ctl == nil || ctl.service == nil {
+		appErr := model.ErrInternal.WithDetail("user controller not initialized")
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	var req RefreshTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	result, err := ctl.service.RefreshToken(req.RefreshToken)
+	if err != nil {
+		switch err {
+		case ErrInvalidRefreshToken:
+			appErr := model.ErrUnauthorized.WithDetail("refresh token 无效或已过期")
+			c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		case ErrUserNotFound:
+			appErr := model.ErrUnauthorized.WithDetail("用户已禁用或不存在")
+			c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		default:
+			appErr := model.ErrInternal.WithDetail(err.Error())
+			c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		}
+		return
 	}
 
 	c.JSON(http.StatusOK, model.ApiSuccessResponse(gin.H{
