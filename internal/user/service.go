@@ -20,6 +20,14 @@ type CreateUserParams struct {
 	Description string
 }
 
+type UpdateUserParams struct {
+	ModuleCode  string
+	UserID      int64
+	UserName    string
+	Description string
+	Email       string
+}
+
 type LoginParams struct {
 	ModuleCode string
 	UserCode   string
@@ -37,6 +45,7 @@ type LoginResult struct {
 var (
 	ErrInvalidCreateUserParams = errors.New("invalid create user params")
 	ErrInvalidLoginParams      = errors.New("invalid login params")
+	ErrInvalidParams           = errors.New("invalid user params")
 	ErrDBNotInitialized        = errors.New("db pool is not initialized")
 	ErrModuleNotFound          = errors.New("module not found")
 	ErrDefaultRoleNotFound     = errors.New("default role not found")
@@ -172,4 +181,145 @@ func (s *Service) Login(params LoginParams) (*LoginResult, error) {
 		RefreshToken: refreshToken,
 		Roles:        rec.Roles,
 	}, nil
+}
+
+func (s *Service) GetByID(moduleCode string, userID int64) (*User, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrDBNotInitialized
+	}
+	if strings.TrimSpace(moduleCode) == "" || userID <= 0 {
+		return nil, ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	moduleID, err := s.repo.GetModuleIDByCode(tx, moduleCode)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.repo.GetUserByID(tx, moduleID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (s *Service) GetList(moduleCode string) ([]*User, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrDBNotInitialized
+	}
+	if strings.TrimSpace(moduleCode) == "" {
+		return nil, ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	moduleID, err := s.repo.GetModuleIDByCode(tx, moduleCode)
+	if err != nil {
+		return nil, err
+	}
+
+	userList, err := s.repo.GetUserList(tx, moduleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return userList, nil
+}
+
+func (s *Service) Update(params UpdateUserParams) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+
+	moduleCode := strings.TrimSpace(params.ModuleCode)
+	userName := strings.TrimSpace(params.UserName)
+	if moduleCode == "" || userName == "" || params.UserID <= 0 {
+		return ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	moduleID, err := s.repo.GetModuleIDByCode(tx, moduleCode)
+	if err != nil {
+		return err
+	}
+
+	if err = s.repo.UpdateUser(tx, params.UserID, moduleID, userName, strings.TrimSpace(params.Description), strings.TrimSpace(params.Email)); err != nil {
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) Delete(moduleCode string, userID int64) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+	if strings.TrimSpace(moduleCode) == "" || userID <= 0 {
+		return ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	moduleID, err := s.repo.GetModuleIDByCode(tx, moduleCode)
+	if err != nil {
+		return err
+	}
+
+	if err = s.repo.DeleteUser(tx, userID, moduleID); err != nil {
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }

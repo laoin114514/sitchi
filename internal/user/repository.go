@@ -17,6 +17,18 @@ func NewRepository(aclDAO *dao.ACLDAO) *Repository {
 	return &Repository{aclDAO: aclDAO}
 }
 
+type User struct {
+	ID          int64  `json:"id"`
+	ModuleID    int64  `json:"module_id"`
+	UserCode    string `json:"user_code"`
+	UserName    string `json:"user_name"`
+	Description string `json:"description"`
+	Email       string `json:"email"`
+	IsActive    bool   `json:"is_active"`
+	UpdatedAt   string `json:"updated_at"`
+	CreatedAt   string `json:"created_at"`
+}
+
 func (r *Repository) GetModuleIDByCode(tx *sql.Tx, moduleCode string) (int64, error) {
 	moduleID, err := r.aclDAO.GetModuleIDByCode(tx, moduleCode)
 	if err != nil {
@@ -128,4 +140,61 @@ func (r *Repository) GetUserAuthRecordByCode(tx *sql.Tx, moduleCode, userCode st
 	}
 	rec.Roles = roles
 	return &rec, nil
+}
+
+func (r *Repository) GetUserByID(tx *sql.Tx, moduleID, userID int64) (*User, error) {
+	var u User
+	err := tx.QueryRow(`
+		SELECT id, module_id, user_code, user_name, COALESCE(description,''), COALESCE(email,''), is_active, updated_at, created_at
+		FROM users
+		WHERE id = $1 AND module_id = $2 AND is_deleted=FALSE
+	`, userID, moduleID).Scan(&u.ID, &u.ModuleID, &u.UserCode, &u.UserName, &u.Description, &u.Email, &u.IsActive, &u.UpdatedAt, &u.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *Repository) GetUserList(tx *sql.Tx, moduleID int64) ([]*User, error) {
+	rows, err := tx.Query(`
+		SELECT id, module_id, user_code, user_name, COALESCE(description,''), COALESCE(email,''), is_active, updated_at, created_at
+		FROM users
+		WHERE module_id = $1 AND is_deleted=FALSE
+	`, moduleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*User
+	for rows.Next() {
+		var u User
+		err := rows.Scan(&u.ID, &u.ModuleID, &u.UserCode, &u.UserName, &u.Description, &u.Email, &u.IsActive, &u.UpdatedAt, &u.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, &u)
+	}
+	return users, rows.Err()
+}
+
+func (r *Repository) UpdateUser(tx *sql.Tx, userID, moduleID int64, userName, description, email string) error {
+	_, err := tx.Exec(`
+		UPDATE users
+		SET user_name = $1, description = $2, email = $3, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $4 AND module_id = $5 AND is_deleted=FALSE
+	`, userName, description, email, userID, moduleID)
+	return err
+}
+
+func (r *Repository) DeleteUser(tx *sql.Tx, userID, moduleID int64) error {
+	_, err := tx.Exec(`
+		UPDATE users
+		SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND module_id = $2 AND is_deleted=FALSE
+	`, userID, moduleID)
+	return err
 }
