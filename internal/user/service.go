@@ -54,15 +54,16 @@ var (
 )
 
 type Service struct {
-	db   *sql.DB
-	repo *Repository
+	db        *sql.DB
+	repo      *Repository
+	commonACL *common.ACLService
 }
 
 func NewService(database *sql.DB, repo *Repository) *Service {
 	if repo == nil {
 		repo = NewRepository(dao.NewACLDAO())
 	}
-	return &Service{db: database, repo: repo}
+	return &Service{db: database, repo: repo, commonACL: common.NewACLService(nil)}
 }
 
 func (s *Service) CreateUser(params CreateUserParams) (int64, error) {
@@ -322,4 +323,72 @@ func (s *Service) Delete(moduleCode string, userID int64) error {
 	}
 
 	return nil
+}
+
+func (s *Service) BindRole(moduleCode string, userID, roleID int64) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+	if strings.TrimSpace(moduleCode) == "" || userID <= 0 || roleID <= 0 {
+		return ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	moduleID, err := s.repo.GetModuleIDByCode(tx, moduleCode)
+	if err != nil {
+		return err
+	}
+
+	if err = s.repo.BindUserRole(tx, userID, moduleID, roleID); err != nil {
+		return err
+	}
+
+	if err = s.commonACL.RebuildUserPermResByUser(tx, moduleID, userID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *Service) UnbindRole(moduleCode string, userID, roleID int64) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+	if strings.TrimSpace(moduleCode) == "" || userID <= 0 || roleID <= 0 {
+		return ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	moduleID, err := s.repo.GetModuleIDByCode(tx, moduleCode)
+	if err != nil {
+		return err
+	}
+
+	if err = s.repo.UnbindUserRole(tx, userID, moduleID, roleID); err != nil {
+		return err
+	}
+
+	if err = s.commonACL.RebuildUserPermResByUser(tx, moduleID, userID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

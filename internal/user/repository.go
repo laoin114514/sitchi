@@ -76,6 +76,10 @@ func (r *Repository) BindUserRole(tx *sql.Tx, userID, moduleID, roleID int64) er
 	return r.aclDAO.BindUserRole(tx, userID, moduleID, roleID)
 }
 
+func (r *Repository) UnbindUserRole(tx *sql.Tx, userID, moduleID, roleID int64) error {
+	return r.aclDAO.UnbindUserRole(tx, userID, moduleID, roleID)
+}
+
 func (r *Repository) RebuildUserPermResByUser(tx *sql.Tx, moduleID, userID int64) error {
 	return r.aclDAO.RebuildUserPermResByUser(tx, moduleID, userID)
 }

@@ -54,6 +54,14 @@ func (d *ACLDAO) BindUserRole(tx *sql.Tx, userID, moduleID, roleID int64) error 
 	return err
 }
 
+func (d *ACLDAO) UnbindUserRole(tx *sql.Tx, userID, moduleID, roleID int64) error {
+	_, err := tx.Exec(`
+		DELETE FROM user_roles
+		WHERE user_id = $1 AND module_id = $2 AND role_id = $3
+	`, userID, moduleID, roleID)
+	return err
+}
+
 func (d *ACLDAO) RebuildUserPermResByUser(tx *sql.Tx, moduleID, userID int64) error {
 	_, err := tx.Exec(`
 		DELETE FROM user_perm_res

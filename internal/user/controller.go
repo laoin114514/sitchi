@@ -49,6 +49,12 @@ type CreateUserRequest struct {
 	Description string `json:"description"`
 }
 
+type BindRoleRequest struct {
+	ModuleCode string `json:"module_code"`
+	UserID     int64  `json:"user_id"`
+	RoleID     int64  `json:"role_id"`
+}
+
 // Login 登录接口：校验账号密码并签发 JWT（access/refresh）。
 func (ctl *Controller) Login(c *gin.Context) {
 	if ctl == nil || ctl.service == nil {
@@ -230,6 +236,52 @@ func (ctl *Controller) Delete(c *gin.Context) {
 	}
 
 	svcErr := ctl.service.Delete(req.ModuleCode, req.UserID)
+	if svcErr != nil {
+		ctl.handleError(c, svcErr)
+		return
+	}
+
+	c.JSON(http.StatusOK, model.ApiSuccessResponse(nil))
+}
+
+func (ctl *Controller) BindRole(c *gin.Context) {
+	if ctl == nil || ctl.service == nil {
+		appErr := model.ErrInternal.WithDetail("user controller not initialized")
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	var req BindRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	svcErr := ctl.service.BindRole(req.ModuleCode, req.UserID, req.RoleID)
+	if svcErr != nil {
+		ctl.handleError(c, svcErr)
+		return
+	}
+
+	c.JSON(http.StatusOK, model.ApiSuccessResponse(nil))
+}
+
+func (ctl *Controller) UnbindRole(c *gin.Context) {
+	if ctl == nil || ctl.service == nil {
+		appErr := model.ErrInternal.WithDetail("user controller not initialized")
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	var req BindRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	svcErr := ctl.service.UnbindRole(req.ModuleCode, req.UserID, req.RoleID)
 	if svcErr != nil {
 		ctl.handleError(c, svcErr)
 		return

@@ -37,6 +37,8 @@ func InitRouter(r *gin.Engine) {
 			userGroup.POST("/create", userController.Create)
 			userGroup.POST("/update", userController.Update)
 			userGroup.POST("/delete", userController.Delete)
+			userGroup.POST("/bind-role", userController.BindRole)
+			userGroup.POST("/unbind-role", userController.UnbindRole)
 		}
 
 		// 角色CRUD
