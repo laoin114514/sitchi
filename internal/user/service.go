@@ -64,7 +64,7 @@ func NewService(database *sql.DB, repo *Repository) *Service {
 	if repo == nil {
 		repo = NewRepository(dao.NewACLDAO())
 	}
-	return &Service{db: database, repo: repo, commonACL: common.NewACLService(nil)}
+	return &Service{db: database, repo: repo, commonACL: common.NewACLService(database, nil)}
 }
 
 func (s *Service) CreateUser(params CreateUserParams) (int64, error) {

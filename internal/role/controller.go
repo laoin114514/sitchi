@@ -33,6 +33,13 @@ type DeleteRoleRequest struct {
 	RoleID     int64  `json:"role_id"`
 }
 
+type BindPermResRequest struct {
+	ModuleCode string `json:"module_code"`
+	RoleID     int64  `json:"role_id"`
+	PermID     int64  `json:"perm_id"`
+	ResID      int64  `json:"res_id"`
+}
+
 func NewController() *Controller {
 	repo := NewRepository(dao.NewACLDAO())
 	service := NewService(db.Pool, repo)
@@ -171,6 +178,52 @@ func (ctl *Controller) Delete(c *gin.Context) {
 	}
 
 	svcErr := ctl.service.Delete(req.ModuleCode, req.RoleID)
+	if svcErr != nil {
+		ctl.handleError(c, svcErr)
+		return
+	}
+
+	c.JSON(http.StatusOK, model.ApiSuccessResponse(nil))
+}
+
+func (ctl *Controller) BindPermRes(c *gin.Context) {
+	if ctl == nil || ctl.service == nil {
+		appErr := model.ErrInternal.WithDetail("role controller not initialized")
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	var req BindPermResRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	svcErr := ctl.service.BindPermRes(req.ModuleCode, req.RoleID, req.PermID, req.ResID)
+	if svcErr != nil {
+		ctl.handleError(c, svcErr)
+		return
+	}
+
+	c.JSON(http.StatusOK, model.ApiSuccessResponse(nil))
+}
+
+func (ctl *Controller) UnbindPermRes(c *gin.Context) {
+	if ctl == nil || ctl.service == nil {
+		appErr := model.ErrInternal.WithDetail("role controller not initialized")
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	var req BindPermResRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		appErr := model.ErrInvalidParams.WithDetail(err.Error())
+		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))
+		return
+	}
+
+	svcErr := ctl.service.UnbindPermRes(req.ModuleCode, req.RoleID, req.PermID, req.ResID)
 	if svcErr != nil {
 		ctl.handleError(c, svcErr)
 		return

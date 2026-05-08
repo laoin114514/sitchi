@@ -3,6 +3,7 @@ package role
 import (
 	"database/sql"
 	"errors"
+	"sitchi/internal/common"
 	"sitchi/internal/dao"
 	"strings"
 )
@@ -28,15 +29,16 @@ var (
 )
 
 type Service struct {
-	db   *sql.DB
-	repo *Repository
+	db        *sql.DB
+	repo      *Repository
+	commonACL *common.ACLService
 }
 
 func NewService(db *sql.DB, repo *Repository) *Service {
 	if repo == nil {
 		repo = NewRepository(dao.NewACLDAO())
 	}
-	return &Service{db: db, repo: repo}
+	return &Service{db: db, repo: repo, commonACL: common.NewACLService(db, nil)}
 }
 
 func (s *Service) CreateRole(params CreateRoleParams) (int64, error) {
@@ -217,4 +219,24 @@ func (s *Service) Delete(moduleCode string, roleID int64) error {
 	}
 
 	return nil
+}
+
+func (s *Service) BindPermRes(moduleCode string, roleID, permID, resID int64) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+	if strings.TrimSpace(moduleCode) == "" || roleID <= 0 || permID <= 0 || resID <= 0 {
+		return ErrInvalidParams
+	}
+	return s.commonACL.BindRolePermRes(moduleCode, roleID, permID, resID)
+}
+
+func (s *Service) UnbindPermRes(moduleCode string, roleID, permID, resID int64) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+	if strings.TrimSpace(moduleCode) == "" || roleID <= 0 || permID <= 0 || resID <= 0 {
+		return ErrInvalidParams
+	}
+	return s.commonACL.UnbindRolePermRes(moduleCode, roleID, permID, resID)
 }

@@ -83,3 +83,47 @@ func (d *ACLDAO) RebuildUserPermResByUser(tx *sql.Tx, moduleID, userID int64) er
 	`, moduleID, userID)
 	return err
 }
+
+func (d *ACLDAO) BindRolePermRes(tx *sql.Tx, moduleID, roleID, permID, resID int64) error {
+	_, err := tx.Exec(`
+		INSERT INTO role_permission_resources (module_id, role_id, perm_id, res_id)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (module_id, role_id, perm_id, res_id) DO NOTHING
+	`, moduleID, roleID, permID, resID)
+	return err
+}
+
+func (d *ACLDAO) UnbindRolePermRes(tx *sql.Tx, moduleID, roleID, permID, resID int64) error {
+	_, err := tx.Exec(`
+		DELETE FROM role_permission_resources
+		WHERE module_id = $1 AND role_id = $2 AND perm_id = $3 AND res_id = $4
+	`, moduleID, roleID, permID, resID)
+	return err
+}
+
+func (d *ACLDAO) RebuildUserPermResByRole(tx *sql.Tx, moduleID, roleID int64) error {
+	_, err := tx.Exec(`
+		DELETE FROM user_perm_res
+		WHERE module_id = $1
+		  AND user_id IN (
+		      SELECT user_id FROM user_roles WHERE module_id = $1 AND role_id = $2
+		  )
+	`, moduleID, roleID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO user_perm_res (module_id, user_id, perm_id, res_id)
+		SELECT DISTINCT ur.module_id, ur.user_id, rpr.perm_id, rpr.res_id
+		FROM user_roles ur
+		JOIN role_permission_resources rpr
+		  ON rpr.module_id = ur.module_id
+		 AND rpr.role_id = ur.role_id
+		WHERE ur.module_id = $1
+		  AND ur.user_id IN (
+		      SELECT user_id FROM user_roles WHERE module_id = $1 AND role_id = $2
+		  )
+	`, moduleID, roleID)
+	return err
+}

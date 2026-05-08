@@ -54,6 +54,8 @@ func InitRouter(r *gin.Engine) {
 			roleGroup.POST("/create", roleController.Create)
 			roleGroup.POST("/update", roleController.Update)
 			roleGroup.POST("/delete", roleController.Delete)
+			roleGroup.POST("/bind-perm-res", roleController.BindPermRes)
+			roleGroup.POST("/unbind-perm-res", roleController.UnbindPermRes)
 		}
 
 		// 权限CRUD
