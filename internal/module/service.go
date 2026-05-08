@@ -15,10 +15,17 @@ type CreateModuleParams struct {
 	ModuleDescription string
 }
 
+type UpdateModuleParams struct {
+	ModuleID    int64
+	ModuleName  string
+	Description string
+}
+
 var (
-	ErrInvalidParams    = errors.New("invalid create module params")
+	ErrInvalidParams    = errors.New("invalid module params")
 	ErrDBNotInitialized = errors.New("db pool is not initialized")
 	ErrOwnerNotFound    = errors.New("owner user not found")
+	ErrModuleNotFound   = errors.New("module not found")
 )
 
 type Service struct {
@@ -164,6 +171,123 @@ func (s *Service) SetModuleOwnerAndGrantAdmin(moduleCode string, ownerUserID int
 	}
 
 	if err = s.repo.RebuildUserPermResByUser(tx, moduleID, ownerUserID); err != nil {
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) GetByID(moduleID int64) (*Module, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrDBNotInitialized
+	}
+	if moduleID <= 0 {
+		return nil, ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	m, err := s.repo.GetModuleByID(tx, moduleID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return m, nil
+}
+
+func (s *Service) GetList() ([]*Module, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrDBNotInitialized
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	list, err := s.repo.GetModuleList(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
+func (s *Service) Update(params UpdateModuleParams) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+
+	moduleName := strings.TrimSpace(params.ModuleName)
+	if params.ModuleID <= 0 || moduleName == "" {
+		return ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if err = s.repo.UpdateModule(tx, params.ModuleID, moduleName, strings.TrimSpace(params.Description)); err != nil {
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) Delete(moduleID int64) error {
+	if s == nil || s.db == nil {
+		return ErrDBNotInitialized
+	}
+	if moduleID <= 0 {
+		return ErrInvalidParams
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if err = s.repo.DeleteModule(tx, moduleID); err != nil {
 		return err
 	}
 

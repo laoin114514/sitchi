@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sitchi/internal/module"
 	perm "sitchi/internal/permission"
 	"sitchi/internal/resource"
 	"sitchi/internal/role"
@@ -18,6 +19,7 @@ func InitRouter(r *gin.Engine) {
 	roleController := role.NewController()
 	permController := perm.NewController()
 	resourceController := resource.NewController()
+	moduleController := module.NewController()
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -76,6 +78,16 @@ func InitRouter(r *gin.Engine) {
 			resourceGroup.POST("/detail", resourceController.GetByID)
 			resourceGroup.POST("/update", resourceController.Update)
 			resourceGroup.POST("/delete", resourceController.Delete)
+		}
+
+		// 模块CRUD
+		moduleGroup := webuiApiGroup.Group("/modules")
+		{
+			moduleGroup.GET("/list", moduleController.GetList)
+			moduleGroup.GET("/detail/:id", moduleController.GetByID)
+			moduleGroup.POST("/create", moduleController.Create)
+			moduleGroup.POST("/update", moduleController.Update)
+			moduleGroup.POST("/delete", moduleController.Delete)
 		}
 	}
 

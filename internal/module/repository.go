@@ -7,6 +7,17 @@ import (
 	"sitchi/internal/dao"
 )
 
+type Module struct {
+	ID          int64  `json:"id"`
+	ModuleCode  string `json:"module_code"`
+	ModuleName  string `json:"module_name"`
+	Description string `json:"description"`
+	OwnerUserID int64  `json:"owner_user_id"`
+	IsActive    bool   `json:"is_active"`
+	UpdatedAt   string `json:"updated_at"`
+	CreatedAt   string `json:"created_at"`
+}
+
 type Repository struct {
 	aclDAO *dao.ACLDAO
 }
@@ -275,4 +286,66 @@ func (r *Repository) EnsureSuperRole(tx *sql.Tx, moduleID int64, moduleCode stri
 	}
 
 	return roleID, nil
+}
+
+func (r *Repository) GetModuleByID(tx *sql.Tx, moduleID int64) (*Module, error) {
+	var m Module
+	var owner any
+	err := tx.QueryRow(`
+		SELECT id, module_code, module_name, COALESCE(description,''), COALESCE(owner_user_id,0), is_active, updated_at, created_at
+		FROM modules
+		WHERE id = $1 AND is_deleted = FALSE
+	`, moduleID).Scan(&m.ID, &m.ModuleCode, &m.ModuleName, &m.Description, &owner, &m.IsActive, &m.UpdatedAt, &m.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrModuleNotFound
+		}
+		return nil, err
+	}
+	m.OwnerUserID = owner.(int64)
+	return &m, nil
+}
+
+func (r *Repository) GetModuleList(tx *sql.Tx) ([]*Module, error) {
+	rows, err := tx.Query(`
+		SELECT id, module_code, module_name, COALESCE(description,''), COALESCE(owner_user_id,0), is_active, updated_at, created_at
+		FROM modules
+		WHERE is_deleted = FALSE
+		ORDER BY id
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var modules []*Module
+	for rows.Next() {
+		var m Module
+		var owner any
+		err := rows.Scan(&m.ID, &m.ModuleCode, &m.ModuleName, &m.Description, &owner, &m.IsActive, &m.UpdatedAt, &m.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		m.OwnerUserID = owner.(int64)
+		modules = append(modules, &m)
+	}
+	return modules, rows.Err()
+}
+
+func (r *Repository) UpdateModule(tx *sql.Tx, moduleID int64, moduleName, description string) error {
+	_, err := tx.Exec(`
+		UPDATE modules
+		SET module_name = $1, description = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $3 AND is_deleted = FALSE
+	`, moduleName, description, moduleID)
+	return err
+}
+
+func (r *Repository) DeleteModule(tx *sql.Tx, moduleID int64) error {
+	_, err := tx.Exec(`
+		UPDATE modules
+		SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND is_deleted = FALSE
+	`, moduleID)
+	return err
 }
