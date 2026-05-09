@@ -24,6 +24,7 @@ func NewController() *Controller {
 
 // CreateRequest 创建资源请求
 type CreateRequest struct {
+	ModuleCode  string `json:"module_code" binding:"required"`
 	ResCode     string `json:"res_code" binding:"required"`
 	ResName     string `json:"res_name" binding:"required"`
 	ResType     string `json:"res_type" binding:"required"`
@@ -34,6 +35,7 @@ type CreateRequest struct {
 
 // UpdateRequest 更新资源请求
 type UpdateRequest struct {
+	ModuleCode  string `json:"module_code" binding:"required"`
 	ResourceID  int64  `json:"resource_id" binding:"required"`
 	ResName     string `json:"res_name" binding:"required"`
 	ResType     string `json:"res_type" binding:"required"`
@@ -44,12 +46,14 @@ type UpdateRequest struct {
 
 // DeleteRequest 删除资源请求
 type DeleteRequest struct {
-	ResourceID int64 `json:"resource_id" binding:"required"`
+	ModuleCode string `json:"module_code" binding:"required"`
+	ResourceID int64  `json:"resource_id" binding:"required"`
 }
 
 // GetByIDRequest 获取资源详情请求
 type GetByIDRequest struct {
-	ResourceID int64 `json:"resource_id" binding:"required"`
+	ModuleCode string `json:"module_code" binding:"required"`
+	ResourceID int64  `json:"resource_id" binding:"required"`
 }
 
 // Create 创建资源接口
@@ -68,14 +72,8 @@ func (ctl *Controller) Create(c *gin.Context) {
 		return
 	}
 
-	// 从上下文获取模块编码（JWT中存储）
-	moduleCode, exists := c.Get("module_code")
-	if !exists {
-		moduleCode = "admin" // 默认模块，实际应从JWT获取
-	}
-
 	resourceID, err := ctl.service.Create(CreateResourceParams{
-		ModuleCode:  moduleCode.(string),
+		ModuleCode:  req.ModuleCode,
 		ResCode:     req.ResCode,
 		ResName:     req.ResName,
 		ResType:     req.ResType,
@@ -122,15 +120,9 @@ func (ctl *Controller) Update(c *gin.Context) {
 		return
 	}
 
-	// 从上下文获取模块编码
-	moduleCode, exists := c.Get("module_code")
-	if !exists {
-		moduleCode = "admin"
-	}
-
 	err := ctl.service.Update(UpdateResourceParams{
 		ResourceID:  req.ResourceID,
-		ModuleCode:  moduleCode.(string),
+		ModuleCode:  req.ModuleCode,
 		ResName:     req.ResName,
 		ResType:     req.ResType,
 		ParentID:    req.ParentID,
@@ -175,13 +167,7 @@ func (ctl *Controller) Delete(c *gin.Context) {
 		return
 	}
 
-	// 从上下文获取模块编码
-	moduleCode, exists := c.Get("module_code")
-	if !exists {
-		moduleCode = "admin"
-	}
-
-	err := ctl.service.Delete(req.ResourceID, moduleCode.(string))
+	err := ctl.service.Delete(req.ResourceID, req.ModuleCode)
 	if err != nil {
 		switch err {
 		case ErrInvalidParams:
@@ -220,13 +206,7 @@ func (ctl *Controller) GetByID(c *gin.Context) {
 		return
 	}
 
-	// 从上下文获取模块编码
-	moduleCode, exists := c.Get("module_code")
-	if !exists {
-		moduleCode = "admin"
-	}
-
-	resource, err := ctl.service.GetByID(req.ResourceID, moduleCode.(string))
+	resource, err := ctl.service.GetByID(req.ResourceID, req.ModuleCode)
 	if err != nil {
 		switch err {
 		case ErrInvalidParams:
@@ -271,13 +251,12 @@ func (ctl *Controller) List(c *gin.Context) {
 		parentID = &pid
 	}
 
-	// 从上下文获取模块编码
-	moduleCode, exists := c.Get("module_code")
-	if !exists {
+	moduleCode := c.Query("module_code")
+	if moduleCode == "" {
 		moduleCode = "admin"
 	}
 
-	resources, err := ctl.service.List(moduleCode.(string), resType, parentID)
+	resources, err := ctl.service.List(moduleCode, resType, parentID)
 	if err != nil {
 		appErr := model.ErrInternal.WithDetail(err.Error())
 		c.JSON(appErr.HTTPStatus(), model.ApiErrorResponse(appErr.Code, appErr.Message, appErr))

@@ -91,6 +91,12 @@ userGroup := r.Group("/user")
 }
 ```
 
+### 2.1.2 登录接口 module_code 约定（2026/5/9新增）
+
+- 登录接口 `/api/webui/login` 的 `module_code` 由后端硬编码为 `"admin"`。
+- 前端无需传入 `module_code` 字段，`LoginRequest` 结构体不包含该字段。
+- **设计原因**：管理系统账号统一归属 `admin` 模块，登录本质上是对 admin 模块的认证入口。跨模块业务接口的模块上下文由 JWT claims 中的 `module_code` 或其他业务参数提供，不通过登录接口传递。
+
 ### 2.2 service
 - 负责业务编排、事务边界、规则校验
 - 只调用 repository/dao，不直接写 SQL
