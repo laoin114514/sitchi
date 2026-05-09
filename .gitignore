@@ -3,3 +3,4 @@ logs
 configs.dev.yml
 configs.prod.yml
 *.exe
+*test*
